@@ -86,3 +86,49 @@ select {
 select:hover {
     background-color: rgba(0, 0, 0, 0.08);
 }
+
+/* ========================================== */
+/* 手机端专属样式：当屏幕宽度小于 768px 时生效 */
+/* ========================================== */
+@media (max-width: 768px) {
+    
+    .app-container {
+        /* 1. 核心：把左右排列改成上下排列 */
+        flex-direction: column; 
+        
+        /* 2. 让内容靠底部对齐，把上面的空间留给人物 */
+        justify-content: flex-end; 
+        
+        /* 3. 调整背景人物的位置，让她在屏幕上方中心出现 */
+        background-position: center 10%; 
+        
+        /* 4. 去掉之前给电脑端预留的右侧间距 */
+        padding-right: 0; 
+    }
+
+    .weather-panel {
+        /* 5. 宽度占满屏幕 */
+        width: 100%; 
+        
+        /* 6. 稍微加一点毛玻璃背景，防止人物挡住文字看不清 */
+        background: rgba(255, 255, 255, 0.5); 
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        
+        /* 7. 只给上方设置圆角，做成一种“底部抽屉”的感觉 */
+        border-radius: 40px 40px 0 0; 
+        
+        /* 8. 缩小一点内边距，让手机屏幕不那么挤 */
+        padding: 30px 20px; 
+        box-sizing: border-box; /* 确保 padding 不撑开宽度 */
+    }
+
+    /* 9. 适当缩小手机上的大字号，不然太占地方了 */
+    .weather-info h1 {
+        font-size: 80px; 
+    }
+    
+    .weather-info {
+        margin-bottom: 30px;
+    }
+}
