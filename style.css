@@ -88,47 +88,53 @@ select:hover {
 }
 
 /* ========================================== */
-/* 手机端专属样式：当屏幕宽度小于 768px 时生效 */
+/* 手机端专属样式：最终精修版 */
 /* ========================================== */
 @media (max-width: 768px) {
-    
     .app-container {
-        /* 1. 核心：把左右排列改成上下排列 */
-        flex-direction: column; 
+        flex-direction: column;    /* 上下排列 */
+        justify-content: flex-end; /* 内容靠下 */
+        padding-right: 0;
+        padding-bottom: 30px;      /* 距离底部的间距 */
         
-        /* 2. 让内容靠底部对齐，把上面的空间留给人物 */
-        justify-content: flex-end; 
-        
-        /* 3. 调整背景人物的位置，让她在屏幕上方中心出现 */
-        background-position: center 10%; 
-        
-        /* 4. 去掉之前给电脑端预留的右侧间距 */
-        padding-right: 0; 
+        /* 调整人物位置：让她稍微大一点，位置稍微往下挪一点，增加重叠感 */
+        background-position: center 15%; 
+        background-size: 95%;      
     }
 
     .weather-panel {
-        /* 5. 宽度占满屏幕 */
-        width: 100%; 
-        
-        /* 6. 稍微加一点毛玻璃背景，防止人物挡住文字看不清 */
-        background: rgba(255, 255, 255, 0.5); 
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        
-        /* 7. 只给上方设置圆角，做成一种“底部抽屉”的感觉 */
-        border-radius: 40px 40px 0 0; 
-        
-        /* 8. 缩小一点内边距，让手机屏幕不那么挤 */
-        padding: 30px 20px; 
-        box-sizing: border-box; /* 确保 padding 不撑开宽度 */
+        width: 100%;
+        /* 核心修改：彻底透明，取消模糊和阴影 */
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
+        border: none;
+        padding: 10px;
     }
 
-    /* 9. 适当缩小手机上的大字号，不然太占地方了 */
-    .weather-info h1 {
-        font-size: 80px; 
-    }
-    
+    /* 调小字号，让视觉更舒适 */
     .weather-info {
-        margin-bottom: 30px;
+        margin-bottom: 20px;
+    }
+
+    .weather-info h2 { 
+        font-size: 16px; /* "你的当前位置" */
+        margin-bottom: 0;
+    } 
+    
+    .weather-info h1 { 
+        font-size: 64px; /* 温度数字从 80px 降到 64px */
+        margin: 5px 0; 
+    } 
+    
+    .weather-info h3 { 
+        font-size: 24px; /* 天气文字 */
+    } 
+
+    /* 按钮稍微缩小一点点，适配小屏幕 */
+    select, button {
+        transform: scale(0.9);
+        margin: 5px;
     }
 }
