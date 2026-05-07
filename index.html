@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>东方天气预报</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 整个大屏幕作为背景 -->
+    <div class="app-container" id="main-background">
+        
+        <!-- 这是一个悬浮在右侧的“毛玻璃卡片” -->
+        <div class="weather-panel">
+            <div class="weather-info">
+                <h2 id="location">上海市 浦东新区</h2>
+                <h1 id="temperature">18<span style="font-size: 40px;">°C</span></h1>
+                <h3 id="weather-text">多云</h3>
+                <p id="temp-range">16 ~ 27°C</p>
+            </div>
+
+            <div class="button-group">
+    <!-- 城市选择下拉框 -->
+    <select id="city-select" onchange="handleCityChange()">
+        <option value="auto">📍 自动定位</option>
+        <option value="112.93,28.23">湖南 长沙</option>
+        <option value="116.40,39.90">北京</option>
+        <option value="113.26,23.12">广东 广州</option>
+        <option value="121.47,31.23">上海</option>
+    </select>
+    
+    <!-- 刷新按钮 -->
+    <button onclick="refreshWeather()" title="刷新天气">🔄</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

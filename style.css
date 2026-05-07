@@ -1,0 +1,88 @@
+body {
+    margin: 0;
+    height: 100vh;
+    font-family: "Microsoft YaHei", sans-serif;
+    background-color: #ffffff; 
+}
+
+/* 大背景容器：占据全屏 */
+.app-container {
+    display: flex;
+    height: 100%;
+    
+    /* 背景图片的设置 */
+    background-size: contain;   /* 依然保证人物不被裁剪 */
+    background-position: left center; /* 核心！让人物靠左边站 */
+    background-repeat: no-repeat;
+    transition: background-image 0.5s ease-in-out;
+    background-color: #ffffff;
+    
+    /* 核心排版：把里面的卡片推到最右边去 */
+    justify-content: flex-end; 
+    align-items: center;
+    padding-right: 8vw; /* 距离屏幕右边缘留一点空隙（8%的屏幕宽度） */
+}
+
+/* 右侧天气面板：变成完全透明的极简风 */
+.weather-panel {
+    width: 400px;
+    padding: 50px 40px;
+    
+    /* 删除了渐变背景、毛玻璃、边框和阴影，只留一个透明底 */
+    background: transparent; 
+    
+    /* 核心：因为背景透明露出了白底，文字必须改成深色 */
+    color: #2c3e50; /* 这是一个非常优雅的深蓝灰色 */
+    
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.weather-info {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+/* 稍微加深一点主标题和温度的颜色 */
+.weather-info h2 { font-size: 24px; font-weight: normal; margin-bottom: 10px; color: #5a6a7e; }
+.weather-info h1 { font-size: 120px; margin: 10px 0; font-weight: 300; color: #1a233a; }
+.weather-info h3 { font-size: 32px; margin: 5px 0; font-weight: normal; }
+.weather-info p { font-size: 18px; color: #5a6a7e; }
+
+/* 按钮也改成适配白底的样式 */
+button {
+    margin: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    cursor: pointer;
+    /* 边框和背景变成浅灰/深色半透明 */
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background-color: rgba(0, 0, 0, 0.03);
+    color: #333333;
+    border-radius: 30px;
+    transition: all 0.3s;
+}
+
+button:hover {
+    background-color: rgba(0, 0, 0, 0.08); /* 鼠标悬浮时稍微变暗一点 */
+    transform: translateY(-2px); 
+}
+
+/* 美化下拉选择框 */
+select {
+    padding: 10px 20px;
+    font-size: 14px;
+    border-radius: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background-color: rgba(0, 0, 0, 0.03);
+    cursor: pointer;
+    outline: none;
+    color: #333;
+    margin-right: 10px;
+}
+
+select:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
