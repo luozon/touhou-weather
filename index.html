@@ -2,38 +2,150 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>东方天气预报</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="融合东方 Project 角色插画的全国天气查询与七日预报网页。">
+    <meta name="theme-color" content="#f4f5f8">
+    <title>幻想乡天象台 · 全国天气预报</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <!-- 整个大屏幕作为背景 -->
-    <div class="app-container" id="main-background">
-        
-        <!-- 这是一个悬浮在右侧的“毛玻璃卡片” -->
-        <div class="weather-panel">
-            <div class="weather-info">
-                <h2 id="location">上海市 浦东新区</h2>
-                <h1 id="temperature">18<span style="font-size: 40px;">°C</span></h1>
-                <h3 id="weather-text">多云</h3>
-                <p id="temp-range">16 ~ 27°C</p>
-            </div>
+<body data-weather="cloudy" data-loading="true">
+    <div class="app-shell" id="main-background">
+        <div class="ambient-glow" aria-hidden="true"></div>
 
-            <div class="button-group">
-    <!-- 城市选择下拉框 -->
-    <select id="city-select" onchange="handleCityChange()">
-        <option value="auto">默认定位</option>
-        <option value="112.93,28.23">湖南 长沙</option>
-        <option value="116.40,39.90">北京</option>
-        <option value="113.26,23.12">广东 广州</option>
-        <option value="121.47,31.23">上海</option>
-    </select>
-    
-    <!-- 刷新按钮 -->
-    <button onclick="refreshWeather()" title="刷新天气">刷新</button>
-            </div>
-        </div>
+        <header class="topbar">
+            <a class="brand" href="./" aria-label="返回幻想乡天象台首页">
+                <span class="brand-mark" aria-hidden="true">天</span>
+                <span>
+                    <strong>幻想乡天象台</strong>
+                    <small>TOUHOU WEATHER OBSERVATORY</small>
+                </span>
+            </a>
 
+            <div class="topbar-actions">
+                <time id="local-date">正在校准历法</time>
+                <button class="location-button" id="locate-button" type="button">
+                    <span aria-hidden="true">⌖</span>
+                    使用当前位置
+                </button>
+            </div>
+        </header>
+
+        <main class="main-layout">
+            <section class="character-stage" aria-label="今日天气对应的东方角色">
+                <div class="orbit orbit-one" aria-hidden="true"></div>
+                <div class="orbit orbit-two" aria-hidden="true"></div>
+                <div class="weather-seal" aria-hidden="true">
+                    <span>今</span><span>日</span><span>天</span><span>象</span>
+                </div>
+
+                <div class="character-caption">
+                    <span class="eyebrow">今日值日</span>
+                    <strong id="character-name">帕秋莉·诺蕾姬</strong>
+                    <p id="character-note">云层翻动，图书馆正在观测气压。</p>
+                </div>
+            </section>
+
+            <section class="dashboard" aria-label="天气预报面板">
+                <div class="search-area">
+                    <form class="search-form" id="city-search-form" role="search" autocomplete="off">
+                        <label class="sr-only" for="city-search-input">搜索城市或地区</label>
+                        <span class="search-icon" aria-hidden="true">⌕</span>
+                        <input
+                            id="city-search-input"
+                            name="city"
+                            type="search"
+                            placeholder="搜索全国城市，例如：长沙、杭州、西安"
+                            aria-controls="search-results"
+                            aria-expanded="false"
+                        >
+                        <button type="submit">查询天气</button>
+                    </form>
+                    <div class="search-results" id="search-results" role="listbox" hidden></div>
+
+                    <div class="quick-cities" aria-label="热门城市">
+                        <span>快捷查询</span>
+                        <button type="button" data-name="北京" data-latitude="39.9042" data-longitude="116.4074">北京</button>
+                        <button type="button" data-name="上海" data-latitude="31.2304" data-longitude="121.4737">上海</button>
+                        <button type="button" data-name="广州" data-latitude="23.1291" data-longitude="113.2644">广州</button>
+                        <button type="button" data-name="成都" data-latitude="30.5728" data-longitude="104.0668">成都</button>
+                        <button type="button" data-name="武汉" data-latitude="30.5928" data-longitude="114.3055">武汉</button>
+                        <button type="button" data-name="西安" data-latitude="34.3416" data-longitude="108.9398">西安</button>
+                    </div>
+                </div>
+
+                <article class="current-card">
+                    <div class="current-heading">
+                        <div>
+                            <span class="eyebrow">实时观测</span>
+                            <h1 id="location">正在获取位置</h1>
+                            <p class="location-detail" id="location-detail">请稍候，正在连接气象站</p>
+                        </div>
+                        <div class="update-time">
+                            <span class="status-dot" aria-hidden="true"></span>
+                            <span id="updated-at">数据更新中</span>
+                        </div>
+                    </div>
+
+                    <div class="current-main">
+                        <div class="temperature-block">
+                            <span id="temperature">--</span><sup>°C</sup>
+                        </div>
+                        <div class="condition-block">
+                            <span class="weather-symbol" id="weather-symbol" aria-hidden="true">☁</span>
+                            <div>
+                                <strong id="weather-text">观测天象中</strong>
+                                <span id="today-range">最高 --° / 最低 --°</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <span>体感温度</span>
+                            <strong id="apparent-temperature">--°</strong>
+                        </div>
+                        <div class="metric">
+                            <span>相对湿度</span>
+                            <strong id="humidity">--%</strong>
+                        </div>
+                        <div class="metric">
+                            <span>风向风速</span>
+                            <strong id="wind">--</strong>
+                        </div>
+                        <div class="metric">
+                            <span>当前降水</span>
+                            <strong id="precipitation">-- mm</strong>
+                        </div>
+                        <div class="metric">
+                            <span>云量</span>
+                            <strong id="cloud-cover">--%</strong>
+                        </div>
+                        <div class="metric">
+                            <span>日出 / 日落</span>
+                            <strong id="sun-times">--:-- / --:--</strong>
+                        </div>
+                    </div>
+                </article>
+
+                <section class="forecast-section" aria-labelledby="forecast-title">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">未来趋势</span>
+                            <h2 id="forecast-title">七日天气预报</h2>
+                        </div>
+                        <p id="forecast-summary">正在推演未来天象</p>
+                    </div>
+                    <div class="forecast-list" id="forecast-list" aria-live="polite"></div>
+                </section>
+
+                <footer class="site-footer">
+                    <span>天气数据由 <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> 提供</span>
+                    <span>角色插画随天气与日期自动切换</span>
+                </footer>
+            </section>
+        </main>
+
+        <div class="toast" id="status-message" role="status" aria-live="polite" hidden></div>
     </div>
 
     <script src="script.js"></script>
