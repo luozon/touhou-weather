@@ -71,6 +71,54 @@
                         <button type="button" data-name="武汉" data-latitude="30.5928" data-longitude="114.3055">武汉</button>
                         <button type="button" data-name="西安" data-latitude="34.3416" data-longitude="108.9398">西安</button>
                     </div>
+
+                    <button
+                        class="district-toggle"
+                        id="district-toggle"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="district-panel"
+                    >
+                        <span class="district-toggle-mark" aria-hidden="true">界</span>
+                        <span class="district-toggle-copy">
+                            <strong>按区县选择</strong>
+                            <small>省份 · 城市 · 区 / 县</small>
+                        </span>
+                        <span class="district-toggle-arrow" aria-hidden="true">⌄</span>
+                    </button>
+
+                    <section class="district-panel" id="district-panel" aria-labelledby="district-panel-title" hidden>
+                        <div class="district-panel-heading">
+                            <div>
+                                <span class="eyebrow">逐级定境</span>
+                                <h2 id="district-panel-title">选择行政区划</h2>
+                            </div>
+                            <button class="district-close" id="district-close" type="button" aria-label="关闭区县选择">×</button>
+                        </div>
+
+                        <form class="district-form" id="district-form">
+                            <label>
+                                <span>省份</span>
+                                <select id="province-select" required>
+                                    <option value="">正在载入省份…</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>城市</span>
+                                <select id="city-select" disabled required>
+                                    <option value="">请先选择省份</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>区 / 县</span>
+                                <select id="district-select" disabled required>
+                                    <option value="">请先选择城市</option>
+                                </select>
+                            </label>
+                            <button class="district-submit" type="submit" disabled>查看区县天气</button>
+                        </form>
+                        <p class="district-hint" id="district-status">选择后将使用区县中心坐标进行网格天气预测。</p>
+                    </section>
                 </div>
 
                 <article class="current-card">
@@ -139,7 +187,7 @@
                 </section>
 
                 <footer class="site-footer">
-                    <span>天气数据由 <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> 提供</span>
+                    <span>天气由 <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> 提供 · 区划数据来自 <a href="https://datav.aliyun.com/" target="_blank" rel="noreferrer">阿里云 DataV</a></span>
                     <span>角色插画随天气与日期自动切换</span>
                 </footer>
             </section>

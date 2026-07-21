@@ -2,6 +2,7 @@
 
 const WEATHER_API = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_API = "https://geocoding-api.open-meteo.com/v1/search";
+const DISTRICT_DATA_API = "https://geo.datav.aliyun.com/areas_v3/bound";
 const STORAGE_LOCATION_KEY = "touhou-weather:last-location";
 const STORAGE_CACHE_KEY = "touhou-weather:last-forecast";
 
@@ -89,6 +90,15 @@ const elements = {
     searchForm: document.getElementById("city-search-form"),
     searchInput: document.getElementById("city-search-input"),
     searchResults: document.getElementById("search-results"),
+    districtToggle: document.getElementById("district-toggle"),
+    districtPanel: document.getElementById("district-panel"),
+    districtClose: document.getElementById("district-close"),
+    districtForm: document.getElementById("district-form"),
+    provinceSelect: document.getElementById("province-select"),
+    citySelect: document.getElementById("city-select"),
+    districtSelect: document.getElementById("district-select"),
+    districtSubmit: document.querySelector(".district-submit"),
+    districtStatus: document.getElementById("district-status"),
     location: document.getElementById("location"),
     locationDetail: document.getElementById("location-detail"),
     updatedAt: document.getElementById("updated-at"),
@@ -113,6 +123,9 @@ let searchTimer = null;
 let toastTimer = null;
 let currentLocation = DEFAULT_LOCATION;
 let weatherRequestSerial = 0;
+let districtDataLoaded = false;
+const areaCache = new Map();
+const areaIndex = new Map();
 
 function getWeatherInfo(code) {
     return WEATHER_CODES[Number(code)] || { text: "天气状况未知", symbol: "·", category: "cloudy" };
@@ -476,6 +489,241 @@ async function searchCities(query) {
     }
 }
 
+function setAreaSelectMessage(select, message, disabled = true) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = message;
+    select.replaceChildren(option);
+    select.disabled = disabled;
+}
+
+function populateAreaSelect(select, areas, placeholder) {
+    const fragment = document.createDocumentFragment();
+    const placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = placeholder;
+    fragment.append(placeholderOption);
+
+    areas.forEach(area => {
+        areaIndex.set(area.adcode, area);
+        const option = document.createElement("option");
+        option.value = area.adcode;
+        option.textContent = area.name;
+        fragment.append(option);
+    });
+
+    select.replaceChildren(fragment);
+    select.disabled = areas.length === 0;
+}
+
+async function fetchAreaChildren(adcode) {
+    if (areaCache.has(adcode)) return areaCache.get(adcode);
+
+    const request = fetch(`${DISTRICT_DATA_API}/${adcode}_full.json`)
+        .then(response => {
+            if (!response.ok) throw new Error(`行政区划服务返回 ${response.status}`);
+            return response.json();
+        })
+        .then(data => (data.features || [])
+            .map(feature => feature.properties || {})
+            .filter(area => area.adcode && area.name && (area.center || area.centroid))
+            .map(area => ({
+                adcode: String(area.adcode),
+                name: area.name,
+                level: area.level,
+                childrenNum: Number(area.childrenNum || 0),
+                center: area.center || area.centroid
+            })));
+
+    areaCache.set(adcode, request);
+
+    try {
+        return await request;
+    } catch (error) {
+        areaCache.delete(adcode);
+        throw error;
+    }
+}
+
+function transformLatitude(longitude, latitude) {
+    let result = -100 + (2 * longitude) + (3 * latitude) + (0.2 * latitude * latitude)
+        + (0.1 * longitude * latitude) + (0.2 * Math.sqrt(Math.abs(longitude)));
+    result += ((20 * Math.sin(6 * longitude * Math.PI)) + (20 * Math.sin(2 * longitude * Math.PI))) * 2 / 3;
+    result += ((20 * Math.sin(latitude * Math.PI)) + (40 * Math.sin(latitude / 3 * Math.PI))) * 2 / 3;
+    result += ((160 * Math.sin(latitude / 12 * Math.PI)) + (320 * Math.sin(latitude * Math.PI / 30))) * 2 / 3;
+    return result;
+}
+
+function transformLongitude(longitude, latitude) {
+    let result = 300 + longitude + (2 * latitude) + (0.1 * longitude * longitude)
+        + (0.1 * longitude * latitude) + (0.1 * Math.sqrt(Math.abs(longitude)));
+    result += ((20 * Math.sin(6 * longitude * Math.PI)) + (20 * Math.sin(2 * longitude * Math.PI))) * 2 / 3;
+    result += ((20 * Math.sin(longitude * Math.PI)) + (40 * Math.sin(longitude / 3 * Math.PI))) * 2 / 3;
+    result += ((150 * Math.sin(longitude / 12 * Math.PI)) + (300 * Math.sin(longitude / 30 * Math.PI))) * 2 / 3;
+    return result;
+}
+
+function convertGcj02ToWgs84(longitude, latitude) {
+    if (longitude < 72.004 || longitude > 137.8347 || latitude < 0.8293 || latitude > 55.8271) {
+        return { longitude, latitude };
+    }
+
+    const earthRadius = 6378245;
+    const eccentricity = 0.006693421622965943;
+    let latitudeOffset = transformLatitude(longitude - 105, latitude - 35);
+    let longitudeOffset = transformLongitude(longitude - 105, latitude - 35);
+    const radianLatitude = latitude / 180 * Math.PI;
+    let magic = Math.sin(radianLatitude);
+    magic = 1 - (eccentricity * magic * magic);
+    const squareRootMagic = Math.sqrt(magic);
+    latitudeOffset = (latitudeOffset * 180) / ((earthRadius * (1 - eccentricity)) / (magic * squareRootMagic) * Math.PI);
+    longitudeOffset = (longitudeOffset * 180) / (earthRadius / squareRootMagic * Math.cos(radianLatitude) * Math.PI);
+
+    return {
+        longitude: longitude - longitudeOffset,
+        latitude: latitude - latitudeOffset
+    };
+}
+
+function updateDistrictSubmitState() {
+    elements.districtSubmit.disabled = !elements.districtSelect.value;
+}
+
+async function loadProvinceOptions() {
+    setAreaSelectMessage(elements.provinceSelect, "正在载入省份…");
+    elements.districtStatus.textContent = "正在读取全国行政区划，请稍候。";
+
+    try {
+        const provinces = await fetchAreaChildren("100000");
+        populateAreaSelect(elements.provinceSelect, provinces, "选择省份");
+        provinces.forEach(province => areaIndex.set(province.adcode, province));
+        districtDataLoaded = true;
+        elements.districtStatus.textContent = "选择后将使用区县中心坐标进行网格天气预测。";
+    } catch (error) {
+        console.error("获取省份列表失败：", error);
+        setAreaSelectMessage(elements.provinceSelect, "载入失败，请关闭后重试");
+        elements.districtStatus.textContent = "行政区划数据暂时无法连接，城市搜索和当前位置仍可正常使用。";
+        showToast("区县数据载入失败，请检查网络后重试。", 5200);
+    }
+}
+
+async function handleProvinceChange() {
+    const province = areaIndex.get(elements.provinceSelect.value);
+    const requestedAdcode = province?.adcode;
+    setAreaSelectMessage(elements.citySelect, province ? "正在载入城市…" : "请先选择省份");
+    setAreaSelectMessage(elements.districtSelect, "请先选择城市");
+    updateDistrictSubmitState();
+    if (!province) return;
+
+    elements.districtStatus.textContent = `正在读取${province.name}的行政区划。`;
+
+    try {
+        if (province.childrenNum === 0) {
+            populateAreaSelect(elements.citySelect, [province], province.name);
+            elements.citySelect.value = province.adcode;
+            elements.citySelect.disabled = true;
+            populateAreaSelect(elements.districtSelect, [province], "选择地区");
+            elements.districtStatus.textContent = "该地区暂无下级区县数据，将使用地区中心坐标。";
+            return;
+        }
+
+        const children = await fetchAreaChildren(province.adcode);
+        if (elements.provinceSelect.value !== requestedAdcode) return;
+        const cities = children.filter(area => area.level !== "district");
+        const directDistricts = children.filter(area => area.level === "district");
+
+        if (cities.length === 0 && directDistricts.length > 0) {
+            populateAreaSelect(elements.citySelect, [province], province.name);
+            elements.citySelect.value = province.adcode;
+            elements.citySelect.disabled = true;
+            populateAreaSelect(elements.districtSelect, directDistricts, "选择区 / 县");
+        } else {
+            populateAreaSelect(elements.citySelect, [...cities, ...directDistricts], "选择城市 / 自治州");
+        }
+
+        elements.districtStatus.textContent = "继续选择城市和区县，预测点将定位到所选区域中心。";
+    } catch (error) {
+        console.error("获取城市列表失败：", error);
+        setAreaSelectMessage(elements.citySelect, "城市载入失败");
+        elements.districtStatus.textContent = "城市数据载入失败，请重新选择省份。";
+        showToast("城市列表载入失败，请稍后重试。", 5000);
+    }
+}
+
+async function handleCityChange() {
+    const city = areaIndex.get(elements.citySelect.value);
+    const requestedAdcode = city?.adcode;
+    setAreaSelectMessage(elements.districtSelect, city ? "正在载入区县…" : "请先选择城市");
+    updateDistrictSubmitState();
+    if (!city) return;
+
+    if (city.level === "district" || city.childrenNum === 0) {
+        populateAreaSelect(elements.districtSelect, [city], "选择区 / 县");
+        elements.districtSelect.value = city.adcode;
+        elements.districtStatus.textContent = "已定位到省直辖区县，可以查询天气。";
+        updateDistrictSubmitState();
+        return;
+    }
+
+    elements.districtStatus.textContent = `正在读取${city.name}的区县。`;
+
+    try {
+        const districts = await fetchAreaChildren(city.adcode);
+        if (elements.citySelect.value !== requestedAdcode) return;
+        populateAreaSelect(elements.districtSelect, districts, "选择区 / 县");
+        elements.districtStatus.textContent = districts.length
+            ? "请选择区或县，预测点将定位到该区域中心。"
+            : "该城市暂无区县数据。";
+    } catch (error) {
+        console.error("获取区县列表失败：", error);
+        setAreaSelectMessage(elements.districtSelect, "区县载入失败");
+        elements.districtStatus.textContent = "区县数据载入失败，请重新选择城市。";
+        showToast("区县列表载入失败，请稍后重试。", 5000);
+    }
+}
+
+function toggleDistrictPanel(forceOpen) {
+    const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : elements.districtPanel.hidden;
+    elements.districtPanel.hidden = !shouldOpen;
+    elements.districtToggle.setAttribute("aria-expanded", String(shouldOpen));
+
+    if (shouldOpen && !districtDataLoaded) {
+        loadProvinceOptions();
+    }
+}
+
+function handleDistrictSubmit(event) {
+    event.preventDefault();
+    const province = areaIndex.get(elements.provinceSelect.value);
+    const city = areaIndex.get(elements.citySelect.value);
+    const district = areaIndex.get(elements.districtSelect.value);
+    const target = district || city || province;
+
+    if (!target || !Array.isArray(target.center) || target.center.length < 2) {
+        showToast("请先完整选择省、市和区县。", 4200);
+        return;
+    }
+
+    const names = [province?.name, city?.name, district?.name]
+        .filter(Boolean)
+        .filter((name, index, array) => array.indexOf(name) === index);
+    const rawCenter = { longitude: Number(target.center[0]), latitude: Number(target.center[1]) };
+    const usesWgs84Directly = ["71", "81", "82"].includes(target.adcode.slice(0, 2));
+    const converted = usesWgs84Directly
+        ? rawCenter
+        : convertGcj02ToWgs84(rawCenter.longitude, rawCenter.latitude);
+
+    fetchWeather({
+        name: target.name,
+        detail: `${names.join(" · ")} · 区县中心点`,
+        latitude: Number(converted.latitude.toFixed(5)),
+        longitude: Number(converted.longitude.toFixed(5))
+    });
+
+    toggleDistrictPanel(false);
+    showToast(`已切换到${names.join(" · ")}的中心点预报。`);
+}
+
 function useCurrentPosition(options = {}) {
     if (!navigator.geolocation) {
         showToast("当前浏览器不支持定位，已显示默认城市天气。", 5200);
@@ -530,6 +778,13 @@ function bindEvents() {
 
     elements.locateButton.addEventListener("click", () => useCurrentPosition());
 
+    elements.districtToggle.addEventListener("click", () => toggleDistrictPanel());
+    elements.districtClose.addEventListener("click", () => toggleDistrictPanel(false));
+    elements.provinceSelect.addEventListener("change", handleProvinceChange);
+    elements.citySelect.addEventListener("change", handleCityChange);
+    elements.districtSelect.addEventListener("change", updateDistrictSubmitState);
+    elements.districtForm.addEventListener("submit", handleDistrictSubmit);
+
     document.querySelectorAll(".quick-cities button").forEach(button => {
         button.addEventListener("click", () => {
             fetchWeather({
@@ -544,6 +799,13 @@ function bindEvents() {
     document.addEventListener("click", event => {
         if (!elements.searchForm.contains(event.target) && !elements.searchResults.contains(event.target)) {
             hideSearchResults();
+        }
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && !elements.districtPanel.hidden) {
+            toggleDistrictPanel(false);
+            elements.districtToggle.focus();
         }
     });
 }
