@@ -17,7 +17,7 @@
 
 ## 数据来源
 
-天气与地理搜索数据来自 [Open-Meteo](https://open-meteo.com/)，中国行政区划中心数据来自 [阿里云 DataV](https://datav.aliyun.com/)。该项目不需要 API Key，因此适合部署在 GitHub Pages 等纯静态托管服务上。
+天气与地理搜索数据来自 [Open-Meteo](https://open-meteo.com/)。中国行政区划中心数据源自 [阿里云 DataV](https://datav.aliyun.com/)，经过精简后随项目静态发布，使用区县选择时不再请求第三方区划接口。该项目不需要 API Key，因此适合部署在 GitHub Pages 等纯静态托管服务上。
 
 “使用当前位置”会按设备提供的经纬度查询；“按区县选择”会使用所选区县的中心坐标。天气结果来自数值模型网格，并不代表区县内每个地点的实况完全相同。
 
@@ -68,6 +68,7 @@ git push origin main
 
 ```text
 touhou-weather/
+├─ data/         # 随站点发布的精简行政区坐标数据
 ├─ images/       # 东方角色插画
 ├─ index.html    # 页面结构
 ├─ style.css     # 视觉与响应式样式

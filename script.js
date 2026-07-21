@@ -2,7 +2,7 @@
 
 const WEATHER_API = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_API = "https://geocoding-api.open-meteo.com/v1/search";
-const DISTRICT_DATA_API = "https://geo.datav.aliyun.com/areas_v3/bound";
+const DISTRICT_DATA_URL = "data/districts.json";
 const STORAGE_LOCATION_KEY = "touhou-weather:last-location";
 const STORAGE_CACHE_KEY = "touhou-weather:last-forecast";
 
@@ -124,7 +124,7 @@ let toastTimer = null;
 let currentLocation = DEFAULT_LOCATION;
 let weatherRequestSerial = 0;
 let districtDataLoaded = false;
-const areaCache = new Map();
+let districtDataPromise = null;
 const areaIndex = new Map();
 
 function getWeatherInfo(code) {
@@ -517,32 +517,20 @@ function populateAreaSelect(select, areas, placeholder) {
 }
 
 async function fetchAreaChildren(adcode) {
-    if (areaCache.has(adcode)) return areaCache.get(adcode);
-
-    const request = fetch(`${DISTRICT_DATA_API}/${adcode}_full.json`)
-        .then(response => {
-            if (!response.ok) throw new Error(`行政区划服务返回 ${response.status}`);
-            return response.json();
-        })
-        .then(data => (data.features || [])
-            .map(feature => feature.properties || {})
-            .filter(area => area.adcode && area.name && (area.center || area.centroid))
-            .map(area => ({
-                adcode: String(area.adcode),
-                name: area.name,
-                level: area.level,
-                childrenNum: Number(area.childrenNum || 0),
-                center: area.center || area.centroid
-            })));
-
-    areaCache.set(adcode, request);
-
-    try {
-        return await request;
-    } catch (error) {
-        areaCache.delete(adcode);
-        throw error;
+    if (!districtDataPromise) {
+        districtDataPromise = fetch(DISTRICT_DATA_URL, { cache: "force-cache" })
+            .then(response => {
+                if (!response.ok) throw new Error(`本地区划数据返回 ${response.status}`);
+                return response.json();
+            })
+            .catch(error => {
+                districtDataPromise = null;
+                throw error;
+            });
     }
+
+    const districtData = await districtDataPromise;
+    return districtData[adcode] || [];
 }
 
 function transformLatitude(longitude, latitude) {
@@ -601,9 +589,9 @@ async function loadProvinceOptions() {
         elements.districtStatus.textContent = "选择后将使用区县中心坐标进行网格天气预测。";
     } catch (error) {
         console.error("获取省份列表失败：", error);
-        setAreaSelectMessage(elements.provinceSelect, "载入失败，请关闭后重试");
-        elements.districtStatus.textContent = "行政区划数据暂时无法连接，城市搜索和当前位置仍可正常使用。";
-        showToast("区县数据载入失败，请检查网络后重试。", 5200);
+        setAreaSelectMessage(elements.provinceSelect, "载入失败，请刷新页面");
+        elements.districtStatus.textContent = "本地区划数据未能载入，城市搜索和当前位置仍可正常使用。";
+        showToast("区县数据文件载入失败，请强制刷新页面后重试。", 5200);
     }
 }
 
