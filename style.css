@@ -214,7 +214,16 @@ a {
 
 .character-stage {
     position: relative;
-    min-height: 760px;
+    align-self: stretch;
+    min-height: 0;
+}
+
+.character-art {
+    position: sticky;
+    top: 92px;
+    width: 100%;
+    aspect-ratio: 10 / 9;
+    isolation: isolate;
     background-image: var(--character-image, url("images/patchouli.jpg"));
     background-repeat: no-repeat;
     background-position: center 44%;
@@ -222,7 +231,7 @@ a {
     transition: background-image 450ms ease, opacity 250ms ease;
 }
 
-.character-stage::after {
+.character-art::after {
     content: "";
     position: absolute;
     inset: auto 4% 0;
@@ -1148,7 +1157,7 @@ body[data-loading="true"] .status-dot {
     animation: pulse 1.2s ease-in-out infinite;
 }
 
-body[data-loading="true"] .character-stage {
+body[data-loading="true"] .character-art {
     opacity: 0.72;
 }
 
@@ -1170,7 +1179,7 @@ input:focus-visible {
         gap: 22px;
     }
 
-    .character-stage {
+    .character-art {
         background-position: center 36%;
     }
 
@@ -1192,6 +1201,13 @@ input:focus-visible {
     .character-stage {
         min-height: 570px;
         margin-bottom: -118px;
+    }
+
+    .character-art {
+        position: relative;
+        top: auto;
+        height: 570px;
+        aspect-ratio: auto;
         background-position: center 38%;
         background-size: min(100%, 680px) auto;
     }
@@ -1238,6 +1254,10 @@ input:focus-visible {
     .character-stage {
         min-height: 470px;
         margin-bottom: -82px;
+    }
+
+    .character-art {
+        height: 470px;
         background-position: center 30%;
         background-size: min(120%, 590px) auto;
     }
@@ -1424,6 +1444,10 @@ input:focus-visible {
 
     .character-stage {
         min-height: 420px;
+    }
+
+    .character-art {
+        height: 420px;
         background-size: 136% auto;
     }
 
