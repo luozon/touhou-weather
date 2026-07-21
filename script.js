@@ -91,6 +91,7 @@ const elements = {
     searchInput: document.getElementById("city-search-input"),
     searchResults: document.getElementById("search-results"),
     districtToggle: document.getElementById("district-toggle"),
+    districtToggleContext: document.getElementById("district-toggle-context"),
     districtPanel: document.getElementById("district-panel"),
     districtClose: document.getElementById("district-close"),
     districtForm: document.getElementById("district-form"),
@@ -126,6 +127,10 @@ let weatherRequestSerial = 0;
 let districtDataLoaded = false;
 let districtDataPromise = null;
 const areaIndex = new Map();
+const areaParentIndex = new Map();
+let administrativeSearchIndex = [];
+let currentSearchResults = [];
+let activeSearchIndex = -1;
 
 function getWeatherInfo(code) {
     return WEATHER_CODES[Number(code)] || { text: "天气状况未知", symbol: "·", category: "cloudy" };
@@ -394,7 +399,7 @@ function updateForecastSummary(daily) {
     }
 }
 
-function buildLocationDetail(result) {
+function buildRemoteLocationDetail(result) {
     const parts = [result.admin2, result.admin1, result.country]
         .filter(Boolean)
         .filter((part, index, array) => array.indexOf(part) === index)
@@ -402,48 +407,119 @@ function buildLocationDetail(result) {
     return parts.join(" · ") || "搜索结果";
 }
 
+function normalizeSearchText(text) {
+    return String(text || "").toLocaleLowerCase("zh-CN").replace(/[\s·,，-]/g, "");
+}
+
+function getAreaShortName(name) {
+    return String(name || "").replace(
+        /(特别行政区|维吾尔自治区|壮族自治区|回族自治区|自治区|自治州|自治县|地区|新区|林区|矿区|省|市|区|县|盟)$/,
+        ""
+    );
+}
+
+function getAreaTrail(adcode) {
+    const trail = [];
+    let currentCode = String(adcode || "");
+    const visited = new Set();
+
+    while (currentCode && currentCode !== "100000" && !visited.has(currentCode)) {
+        visited.add(currentCode);
+        const area = areaIndex.get(currentCode);
+        if (area) trail.unshift(area);
+        currentCode = areaParentIndex.get(currentCode);
+    }
+
+    return trail;
+}
+
+function formatAreaTrail(adcode) {
+    return getAreaTrail(adcode)
+        .map(area => area.name)
+        .filter((name, index, array) => array.indexOf(name) === index)
+        .join(" · ");
+}
+
+function getAreaLevelLabel(level) {
+    if (level === "province") return "省级";
+    if (level === "city") return "城市";
+    if (level === "district") return "区县";
+    return "地区";
+}
+
 function hideSearchResults() {
     elements.searchResults.hidden = true;
     elements.searchInput.setAttribute("aria-expanded", "false");
+    elements.searchInput.removeAttribute("aria-activedescendant");
+    currentSearchResults = [];
+    activeSearchIndex = -1;
 }
 
-function showSearchResults(results) {
+function setActiveSearchIndex(index) {
+    const options = Array.from(elements.searchResults.querySelectorAll(".search-result"));
+    if (!options.length) return;
+
+    activeSearchIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => {
+        const isActive = optionIndex === activeSearchIndex;
+        option.classList.toggle("is-active", isActive);
+        option.setAttribute("aria-selected", String(isActive));
+    });
+    elements.searchInput.setAttribute("aria-activedescendant", options[activeSearchIndex].id);
+}
+
+async function selectSearchResult(result) {
+    elements.searchInput.value = "";
+    hideSearchResults();
+
+    if (result.source === "local") {
+        await selectAdministrativeArea(result.adcode, { fetchForecast: true });
+        return;
+    }
+
+    fetchWeather({
+        name: result.name,
+        detail: result.detail,
+        latitude: Number(result.latitude),
+        longitude: Number(result.longitude)
+    });
+}
+
+function showSearchResults(results, keyword = "") {
     elements.searchResults.replaceChildren();
+    currentSearchResults = results;
+    activeSearchIndex = -1;
 
     if (!results.length) {
         const empty = document.createElement("p");
         empty.className = "search-empty";
-        empty.textContent = "没有找到这个地点，请尝试输入完整城市名。";
+        empty.textContent = keyword
+            ? `没有找到“${keyword}”。可输入省、市、区县全名，或尝试其他地点。`
+            : "输入省、市或区县名称开始查询。";
         elements.searchResults.append(empty);
     } else {
-        results.forEach(result => {
+        results.forEach((result, index) => {
             const button = document.createElement("button");
             button.className = "search-result";
             button.type = "button";
             button.setAttribute("role", "option");
+            button.setAttribute("aria-selected", "false");
+            button.id = `search-result-${index}`;
 
             const label = document.createElement("span");
             const name = document.createElement("strong");
             const detail = document.createElement("span");
-            const coordinates = document.createElement("em");
+            const badge = document.createElement("em");
 
             name.textContent = result.name;
-            detail.textContent = buildLocationDetail(result);
-            coordinates.textContent = `${Number(result.latitude).toFixed(1)}°, ${Number(result.longitude).toFixed(1)}°`;
+            detail.textContent = result.detail;
+            badge.textContent = result.levelLabel;
+            badge.className = `search-result-badge search-result-badge-${result.source}`;
             label.append(name, detail);
-            button.append(label, coordinates);
+            button.append(label, badge);
 
-            button.addEventListener("click", () => {
-                const location = {
-                    name: result.name,
-                    detail: buildLocationDetail(result),
-                    latitude: Number(result.latitude),
-                    longitude: Number(result.longitude)
-                };
-                elements.searchInput.value = "";
-                hideSearchResults();
-                fetchWeather(location);
-            });
+            button.addEventListener("mouseenter", () => setActiveSearchIndex(index));
+            button.addEventListener("click", () => selectSearchResult(result));
 
             elements.searchResults.append(button);
         });
@@ -451,41 +527,108 @@ function showSearchResults(results) {
 
     elements.searchResults.hidden = false;
     elements.searchInput.setAttribute("aria-expanded", "true");
+    if (results.length) setActiveSearchIndex(0);
 }
 
-async function searchCities(query) {
+function searchAdministrativeAreas(keyword, limit = 10) {
+    const normalizedQuery = normalizeSearchText(keyword);
+    if (!normalizedQuery) return [];
+
+    return administrativeSearchIndex
+        .map(entry => {
+            let score = Number.POSITIVE_INFINITY;
+            if (entry.normalizedName === normalizedQuery) score = 0;
+            else if (entry.normalizedShortName === normalizedQuery) score = 1;
+            else if (entry.normalizedPath === normalizedQuery || entry.normalizedShortPath === normalizedQuery) score = 2;
+            else if (entry.normalizedName.startsWith(normalizedQuery)) score = 3;
+            else if (entry.normalizedShortName.startsWith(normalizedQuery)) score = 4;
+            else if (entry.normalizedName.includes(normalizedQuery)) score = 5;
+            else if (entry.normalizedPath.includes(normalizedQuery) || entry.normalizedShortPath.includes(normalizedQuery)) score = 6;
+            return {
+                ...entry,
+                score,
+                exact: entry.normalizedName === normalizedQuery
+                    || entry.normalizedShortName === normalizedQuery
+                    || entry.normalizedPath === normalizedQuery
+                    || entry.normalizedShortPath === normalizedQuery
+            };
+        })
+        .filter(entry => Number.isFinite(entry.score))
+        .sort((left, right) => left.score - right.score
+            || left.pathDepth - right.pathDepth
+            || left.area.name.localeCompare(right.area.name, "zh-CN"))
+        .slice(0, limit)
+        .map(entry => ({
+            source: "local",
+            adcode: entry.area.adcode,
+            name: entry.area.name,
+            detail: entry.path,
+            levelLabel: getAreaLevelLabel(entry.area.level),
+            exact: entry.exact
+        }));
+}
+
+async function searchRemotePlaces(keyword) {
+    if (searchRequestController) searchRequestController.abort();
+    searchRequestController = new AbortController();
+
+    const params = new URLSearchParams({
+        name: keyword,
+        count: "8",
+        language: "zh",
+        format: "json"
+    });
+
+    const response = await fetch(`${GEOCODING_API}?${params.toString()}`, {
+        signal: searchRequestController.signal
+    });
+    if (!response.ok) throw new Error(`地点搜索返回 ${response.status}`);
+
+    const data = await response.json();
+    return (data.results || []).map(result => ({
+        source: "remote",
+        name: result.name,
+        detail: buildRemoteLocationDetail(result),
+        levelLabel: "其他地点",
+        latitude: Number(result.latitude),
+        longitude: Number(result.longitude),
+        exact: normalizeSearchText(result.name) === normalizeSearchText(keyword)
+    }));
+}
+
+async function searchPlaces(query, options = {}) {
     const keyword = query.trim();
     if (!keyword) {
         hideSearchResults();
         return;
     }
 
-    if (searchRequestController) searchRequestController.abort();
-    searchRequestController = new AbortController();
-
-    const params = new URLSearchParams({
-        name: keyword,
-        count: "10",
-        language: "zh",
-        format: "json"
-    });
+    if (searchRequestController) {
+        searchRequestController.abort();
+        searchRequestController = null;
+    }
 
     try {
-        const response = await fetch(`${GEOCODING_API}?${params.toString()}`, {
-            signal: searchRequestController.signal
-        });
-        if (!response.ok) throw new Error(`地点搜索返回 ${response.status}`);
+        await ensureDistrictData();
+        let results = searchAdministrativeAreas(keyword);
+        if (!results.length) results = await searchRemotePlaces(keyword);
 
-        const data = await response.json();
-        const results = (data.results || []).sort((a, b) => {
-            const chinaCodes = ["CN", "HK", "MO", "TW"];
-            return Number(chinaCodes.includes(b.country_code)) - Number(chinaCodes.includes(a.country_code));
-        });
-        showSearchResults(results);
+        const exactResults = results.filter(result => result.exact);
+        if (options.submit && exactResults.length === 1) {
+            await selectSearchResult(exactResults[0]);
+            return;
+        }
+        if (options.submit && results.length === 1) {
+            await selectSearchResult(results[0]);
+            return;
+        }
+
+        showSearchResults(results, keyword);
     } catch (error) {
         if (error.name === "AbortError") return;
         console.error("搜索地点失败：", error);
-        showToast("地点搜索暂时不可用，请检查网络后重试。", 5000);
+        showSearchResults([], keyword);
+        showToast("地点搜索暂时不可用，请刷新页面后重试。", 5000);
     }
 }
 
@@ -516,7 +659,7 @@ function populateAreaSelect(select, areas, placeholder) {
     select.disabled = areas.length === 0;
 }
 
-async function fetchAreaChildren(adcode) {
+async function ensureDistrictData() {
     if (!districtDataPromise) {
         districtDataPromise = fetch(DISTRICT_DATA_URL, { cache: "force-cache" })
             .then(response => {
@@ -530,6 +673,35 @@ async function fetchAreaChildren(adcode) {
     }
 
     const districtData = await districtDataPromise;
+    if (!administrativeSearchIndex.length) {
+        Object.entries(districtData).forEach(([parentAdcode, areas]) => {
+            areas.forEach(area => {
+                areaIndex.set(area.adcode, area);
+                areaParentIndex.set(area.adcode, parentAdcode);
+            });
+        });
+
+        administrativeSearchIndex = Array.from(areaIndex.values()).map(area => {
+            const path = formatAreaTrail(area.adcode);
+            return {
+                area,
+                path,
+                pathDepth: getAreaTrail(area.adcode).length,
+                normalizedName: normalizeSearchText(area.name),
+                normalizedShortName: normalizeSearchText(getAreaShortName(area.name)),
+                normalizedPath: normalizeSearchText(path),
+                normalizedShortPath: normalizeSearchText(
+                    getAreaTrail(area.adcode).map(item => getAreaShortName(item.name)).join(" · ")
+                )
+            };
+        });
+    }
+
+    return districtData;
+}
+
+async function fetchAreaChildren(adcode) {
+    const districtData = await ensureDistrictData();
     return districtData[adcode] || [];
 }
 
@@ -573,8 +745,100 @@ function convertGcj02ToWgs84(longitude, latitude) {
     };
 }
 
+function createLocationFromArea(area) {
+    const rawCenter = { longitude: Number(area.center[0]), latitude: Number(area.center[1]) };
+    const usesWgs84Directly = ["71", "81", "82"].includes(area.adcode.slice(0, 2));
+    const converted = usesWgs84Directly
+        ? rawCenter
+        : convertGcj02ToWgs84(rawCenter.longitude, rawCenter.latitude);
+
+    return {
+        name: area.name,
+        detail: `${formatAreaTrail(area.adcode)} · 区域中心点`,
+        adcode: area.adcode,
+        latitude: Number(converted.latitude.toFixed(5)),
+        longitude: Number(converted.longitude.toFixed(5))
+    };
+}
+
+async function syncDistrictSelector(adcode) {
+    await ensureDistrictData();
+    if (!districtDataLoaded) await loadProvinceOptions();
+
+    const trail = getAreaTrail(adcode);
+    const target = areaIndex.get(String(adcode));
+    const province = trail.find(area => area.level === "province") || trail[0];
+    const city = trail.find(area => area.level === "city");
+    if (!province || !target) return;
+
+    elements.provinceSelect.value = province.adcode;
+    await handleProvinceChange();
+
+    if (city) {
+        elements.citySelect.value = city.adcode;
+        await handleCityChange();
+    } else if (target.level === "district") {
+        const isDirectDistrictOption = Array.from(elements.citySelect.options)
+            .some(option => option.value === target.adcode);
+        if (isDirectDistrictOption) {
+            elements.citySelect.disabled = false;
+            elements.citySelect.value = target.adcode;
+            await handleCityChange();
+        }
+    }
+
+    if (target.level === "district") {
+        const hasDistrictOption = Array.from(elements.districtSelect.options)
+            .some(option => option.value === target.adcode);
+        if (hasDistrictOption) elements.districtSelect.value = target.adcode;
+    }
+
+    const contextAreas = [province, city]
+        .filter(Boolean)
+        .filter((area, index, array) => array.findIndex(item => item.adcode === area.adcode) === index);
+    const context = contextAreas.map(area => area.name).join(" · ");
+    elements.districtToggleContext.textContent = target.level === "district"
+        ? `${context} · ${target.name}`
+        : `${context || target.name} · 请选择区 / 县`;
+    elements.districtStatus.textContent = target.level === "district"
+        ? `已同步到${formatAreaTrail(target.adcode)}，可以直接查看区县天气。`
+        : `已同步到${context || target.name}，请选择区或县。`;
+    updateDistrictSubmitState();
+}
+
+async function selectAdministrativeArea(adcode, options = {}) {
+    await ensureDistrictData();
+    const area = areaIndex.get(String(adcode));
+    if (!area) {
+        showToast("没有找到对应的行政区数据。", 4200);
+        return;
+    }
+
+    await syncDistrictSelector(area.adcode);
+    if (options.fetchForecast !== false) fetchWeather(createLocationFromArea(area));
+}
+
 function updateDistrictSubmitState() {
     elements.districtSubmit.disabled = !elements.districtSelect.value;
+}
+
+function updateDistrictContextFromSelections() {
+    const province = areaIndex.get(elements.provinceSelect.value);
+    const city = areaIndex.get(elements.citySelect.value);
+    const district = areaIndex.get(elements.districtSelect.value);
+    const names = [province?.name, city?.name, district?.name]
+        .filter(Boolean)
+        .filter((name, index, array) => array.indexOf(name) === index);
+
+    if (!names.length) {
+        elements.districtToggleContext.textContent = "省份 · 城市 · 区 / 县";
+    } else if (district) {
+        elements.districtToggleContext.textContent = names.join(" · ");
+    } else if (city) {
+        elements.districtToggleContext.textContent = `${names.join(" · ")} · 请选择区 / 县`;
+    } else {
+        elements.districtToggleContext.textContent = `${names.join(" · ")} · 请选择城市`;
+    }
 }
 
 async function loadProvinceOptions() {
@@ -695,18 +959,7 @@ function handleDistrictSubmit(event) {
     const names = [province?.name, city?.name, district?.name]
         .filter(Boolean)
         .filter((name, index, array) => array.indexOf(name) === index);
-    const rawCenter = { longitude: Number(target.center[0]), latitude: Number(target.center[1]) };
-    const usesWgs84Directly = ["71", "81", "82"].includes(target.adcode.slice(0, 2));
-    const converted = usesWgs84Directly
-        ? rawCenter
-        : convertGcj02ToWgs84(rawCenter.longitude, rawCenter.latitude);
-
-    fetchWeather({
-        name: target.name,
-        detail: `${names.join(" · ")} · 区县中心点`,
-        latitude: Number(converted.latitude.toFixed(5)),
-        longitude: Number(converted.longitude.toFixed(5))
-    });
+    fetchWeather(createLocationFromArea(target));
 
     toggleDistrictPanel(false);
     showToast(`已切换到${names.join(" · ")}的中心点预报。`);
@@ -747,40 +1000,69 @@ function bindEvents() {
     elements.searchForm.addEventListener("submit", event => {
         event.preventDefault();
         window.clearTimeout(searchTimer);
-        searchCities(elements.searchInput.value);
+        searchPlaces(elements.searchInput.value, { submit: true });
     });
 
     elements.searchInput.addEventListener("input", () => {
         window.clearTimeout(searchTimer);
+        hideSearchResults();
         const query = elements.searchInput.value.trim();
         if (query.length < 2) {
             hideSearchResults();
             return;
         }
-        searchTimer = window.setTimeout(() => searchCities(query), 420);
+        searchTimer = window.setTimeout(() => searchPlaces(query), 240);
     });
 
     elements.searchInput.addEventListener("keydown", event => {
-        if (event.key === "Escape") hideSearchResults();
+        if (event.key === "ArrowDown" && currentSearchResults.length) {
+            event.preventDefault();
+            setActiveSearchIndex(activeSearchIndex + 1);
+        } else if (event.key === "ArrowUp" && currentSearchResults.length) {
+            event.preventDefault();
+            setActiveSearchIndex(activeSearchIndex - 1);
+        } else if (event.key === "Enter" && !elements.searchResults.hidden && activeSearchIndex >= 0) {
+            event.preventDefault();
+            window.clearTimeout(searchTimer);
+            selectSearchResult(currentSearchResults[activeSearchIndex]);
+        } else if (event.key === "Escape") {
+            hideSearchResults();
+        }
     });
 
     elements.locateButton.addEventListener("click", () => useCurrentPosition());
 
     elements.districtToggle.addEventListener("click", () => toggleDistrictPanel());
     elements.districtClose.addEventListener("click", () => toggleDistrictPanel(false));
-    elements.provinceSelect.addEventListener("change", handleProvinceChange);
-    elements.citySelect.addEventListener("change", handleCityChange);
-    elements.districtSelect.addEventListener("change", updateDistrictSubmitState);
+    elements.provinceSelect.addEventListener("change", async () => {
+        await handleProvinceChange();
+        updateDistrictContextFromSelections();
+    });
+    elements.citySelect.addEventListener("change", async () => {
+        await handleCityChange();
+        updateDistrictContextFromSelections();
+    });
+    elements.districtSelect.addEventListener("change", () => {
+        updateDistrictSubmitState();
+        updateDistrictContextFromSelections();
+    });
     elements.districtForm.addEventListener("submit", handleDistrictSubmit);
 
     document.querySelectorAll(".quick-cities button").forEach(button => {
-        button.addEventListener("click", () => {
-            fetchWeather({
-                name: button.dataset.name,
-                detail: `${button.dataset.name}市 · 中国`,
-                latitude: Number(button.dataset.latitude),
-                longitude: Number(button.dataset.longitude)
-            });
+        button.addEventListener("click", async () => {
+            elements.searchInput.value = "";
+            hideSearchResults();
+            try {
+                await selectAdministrativeArea(button.dataset.adcode, { fetchForecast: true });
+            } catch (error) {
+                console.error("快捷城市同步失败：", error);
+                fetchWeather({
+                    name: button.dataset.name,
+                    detail: `${button.dataset.name}市 · 中国`,
+                    latitude: Number(button.dataset.latitude),
+                    longitude: Number(button.dataset.longitude)
+                });
+            }
         });
     });
 
@@ -805,6 +1087,11 @@ function initialize() {
     const savedLocation = loadLocation();
     if (savedLocation) {
         fetchWeather(savedLocation, { persist: false });
+        if (savedLocation.adcode) {
+            syncDistrictSelector(savedLocation.adcode).catch(error => {
+                console.warn("无法恢复行政区选择：", error);
+            });
+        }
     } else {
         useCurrentPosition({ fallback: true });
     }

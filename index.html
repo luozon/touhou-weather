@@ -54,7 +54,9 @@
                             id="city-search-input"
                             name="city"
                             type="search"
-                            placeholder="搜索全国城市，例如：长沙、杭州、西安"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            placeholder="搜索省、市、区县，例如：安徽、六安、金安区"
                             aria-controls="search-results"
                             aria-expanded="false"
                         >
@@ -64,12 +66,12 @@
 
                     <div class="quick-cities" aria-label="热门城市">
                         <span>快捷查询</span>
-                        <button type="button" data-name="北京" data-latitude="39.9042" data-longitude="116.4074">北京</button>
-                        <button type="button" data-name="上海" data-latitude="31.2304" data-longitude="121.4737">上海</button>
-                        <button type="button" data-name="广州" data-latitude="23.1291" data-longitude="113.2644">广州</button>
-                        <button type="button" data-name="成都" data-latitude="30.5728" data-longitude="104.0668">成都</button>
-                        <button type="button" data-name="武汉" data-latitude="30.5928" data-longitude="114.3055">武汉</button>
-                        <button type="button" data-name="西安" data-latitude="34.3416" data-longitude="108.9398">西安</button>
+                        <button type="button" data-adcode="110000" data-name="北京" data-latitude="39.9042" data-longitude="116.4074">北京</button>
+                        <button type="button" data-adcode="310000" data-name="上海" data-latitude="31.2304" data-longitude="121.4737">上海</button>
+                        <button type="button" data-adcode="440100" data-name="广州" data-latitude="23.1291" data-longitude="113.2644">广州</button>
+                        <button type="button" data-adcode="510100" data-name="成都" data-latitude="30.5728" data-longitude="104.0668">成都</button>
+                        <button type="button" data-adcode="420100" data-name="武汉" data-latitude="30.5928" data-longitude="114.3055">武汉</button>
+                        <button type="button" data-adcode="610100" data-name="西安" data-latitude="34.3416" data-longitude="108.9398">西安</button>
                     </div>
 
                     <button
@@ -82,7 +84,7 @@
                         <span class="district-toggle-mark" aria-hidden="true">界</span>
                         <span class="district-toggle-copy">
                             <strong>按区县选择</strong>
-                            <small>省份 · 城市 · 区 / 县</small>
+                            <small id="district-toggle-context">省份 · 城市 · 区 / 县</small>
                         </span>
                         <span class="district-toggle-arrow" aria-hidden="true">⌄</span>
                     </button>
