@@ -682,6 +682,7 @@ a {
 }
 
 .current-card,
+.hourly-section,
 .forecast-section {
     border: 1px solid rgba(255, 255, 255, 0.82);
     background: rgba(255, 255, 255, 0.76);
@@ -831,6 +832,7 @@ a {
     white-space: nowrap;
 }
 
+.hourly-section,
 .forecast-section {
     margin-top: 18px;
     padding: 25px 27px 22px;
@@ -851,6 +853,182 @@ a {
     margin: 0 0 2px;
     color: var(--ink-soft);
     font-size: 11px;
+}
+
+.weather-change-notice {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
+    border-radius: 16px 16px 16px 5px;
+    background: rgba(var(--accent-rgb), 0.08);
+}
+
+.weather-change-notice[hidden] {
+    display: none;
+}
+
+.change-notice-symbol {
+    display: grid;
+    width: 39px;
+    height: 39px;
+    place-items: center;
+    border-radius: 13px 13px 13px 4px;
+    color: var(--accent);
+    font-family: "Times New Roman", serif;
+    font-size: 25px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.weather-change-notice strong,
+.weather-change-notice p {
+    display: block;
+    margin: 0;
+}
+
+.weather-change-notice strong {
+    font-size: 13px;
+}
+
+.weather-change-notice p {
+    margin-top: 4px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    line-height: 1.55;
+}
+
+.change-notice-window {
+    color: var(--accent);
+    font-family: var(--data-font);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.hourly-scroll {
+    margin-top: 18px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-color: rgba(var(--accent-rgb), 0.25) transparent;
+    scrollbar-width: thin;
+}
+
+.hourly-scroll:focus-visible {
+    outline: 3px solid rgba(var(--accent-rgb), 0.2);
+    outline-offset: 4px;
+    border-radius: 10px;
+}
+
+.hourly-timeline {
+    width: 100%;
+    min-width: 1680px;
+}
+
+.hourly-time-row,
+.hourly-list {
+    display: grid;
+    grid-template-columns: repeat(24, minmax(70px, 1fr));
+}
+
+.hourly-time-row span {
+    color: var(--ink-soft);
+    font-family: var(--data-font);
+    font-size: 10px;
+    text-align: center;
+}
+
+.hourly-time-row span:first-child {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.hourly-chart {
+    display: block;
+    width: 100%;
+    height: 88px;
+    margin-top: 4px;
+    overflow: visible;
+}
+
+.hourly-chart-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.hourly-chart-area {
+    fill: rgba(var(--accent-rgb), 0.08);
+    stroke: none;
+}
+
+.hourly-chart-point {
+    fill: var(--paper-strong);
+    stroke: var(--accent);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+
+.hourly-list {
+    border-top: 1px solid var(--line);
+}
+
+.hourly-item {
+    min-width: 0;
+    padding: 13px 6px 11px;
+    border-right: 1px solid var(--line);
+    text-align: center;
+}
+
+.hourly-item:first-child {
+    border-radius: 12px 0 0 12px;
+    background: rgba(var(--accent-rgb), 0.07);
+}
+
+.hourly-item span,
+.hourly-item strong {
+    display: block;
+}
+
+.hourly-symbol {
+    min-height: 28px;
+    color: var(--accent);
+    font-family: "Times New Roman", serif;
+    font-size: 25px;
+    line-height: 1;
+}
+
+.hourly-temperature {
+    margin-top: 8px;
+    font-family: var(--data-font);
+    font-size: 14px;
+}
+
+.hourly-condition {
+    margin-top: 5px;
+    overflow: hidden;
+    color: var(--ink-soft);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hourly-rain,
+.hourly-wind {
+    margin-top: 7px;
+    color: var(--ink-soft);
+    font-family: var(--data-font);
+    font-size: 9px;
+}
+
+.hourly-rain.has-rain {
+    color: #4f89ae;
+    font-weight: 700;
 }
 
 .forecast-list {
@@ -960,6 +1138,7 @@ a {
 }
 
 body[data-loading="true"] .current-card,
+body[data-loading="true"] .hourly-section,
 body[data-loading="true"] .forecast-section {
     cursor: progress;
 }
@@ -1029,6 +1208,7 @@ input:focus-visible {
 
     .search-form,
     .current-card,
+    .hourly-section,
     .forecast-section {
         background: rgba(255, 255, 255, 0.88);
     }
@@ -1164,8 +1344,22 @@ input:focus-visible {
         padding: 15px 12px;
     }
 
+    .hourly-section,
     .forecast-section {
         padding: 22px 18px 18px;
+    }
+
+    .weather-change-notice {
+        grid-template-columns: auto 1fr;
+    }
+
+    .change-notice-window {
+        display: none;
+    }
+
+    .hourly-scroll {
+        margin-right: -18px;
+        padding-right: 18px;
     }
 
     .section-heading {

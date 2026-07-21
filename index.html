@@ -177,6 +177,44 @@
                     </div>
                 </article>
 
+                <section class="hourly-section" aria-labelledby="hourly-title">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">二十四时天象</span>
+                            <h2 id="hourly-title">未来 24 小时</h2>
+                        </div>
+                        <p id="hourly-summary">逐小时温度与降水趋势</p>
+                    </div>
+
+                    <div class="weather-change-notice" id="weather-change-notice" role="status" hidden>
+                        <span class="change-notice-symbol" id="change-notice-symbol" aria-hidden="true">☂</span>
+                        <div>
+                            <strong id="change-notice-title">短时天气提醒</strong>
+                            <p id="change-notice-detail"></p>
+                        </div>
+                        <span class="change-notice-window">未来 5H</span>
+                    </div>
+
+                    <div class="hourly-scroll" tabindex="0" aria-label="未来24小时天气，可横向滚动查看">
+                        <div class="hourly-timeline" id="hourly-timeline">
+                            <div class="hourly-time-row" id="hourly-time-row"></div>
+                            <svg
+                                class="hourly-chart"
+                                id="hourly-chart"
+                                viewBox="0 0 1920 88"
+                                preserveAspectRatio="none"
+                                role="img"
+                                aria-label="未来24小时温度趋势曲线"
+                            >
+                                <path class="hourly-chart-area" id="hourly-chart-area"></path>
+                                <path class="hourly-chart-line" id="hourly-chart-line"></path>
+                                <g id="hourly-chart-points"></g>
+                            </svg>
+                            <div class="hourly-list" id="hourly-list" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="forecast-section" aria-labelledby="forecast-title">
                     <div class="section-heading">
                         <div>

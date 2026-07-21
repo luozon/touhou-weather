@@ -113,6 +113,17 @@ const elements = {
     precipitation: document.getElementById("precipitation"),
     cloudCover: document.getElementById("cloud-cover"),
     sunTimes: document.getElementById("sun-times"),
+    hourlySection: document.querySelector(".hourly-section"),
+    hourlySummary: document.getElementById("hourly-summary"),
+    hourlyTimeRow: document.getElementById("hourly-time-row"),
+    hourlyChartArea: document.getElementById("hourly-chart-area"),
+    hourlyChartLine: document.getElementById("hourly-chart-line"),
+    hourlyChartPoints: document.getElementById("hourly-chart-points"),
+    hourlyList: document.getElementById("hourly-list"),
+    changeNotice: document.getElementById("weather-change-notice"),
+    changeNoticeSymbol: document.getElementById("change-notice-symbol"),
+    changeNoticeTitle: document.getElementById("change-notice-title"),
+    changeNoticeDetail: document.getElementById("change-notice-detail"),
     forecastList: document.getElementById("forecast-list"),
     forecastSummary: document.getElementById("forecast-summary"),
     statusMessage: document.getElementById("status-message")
@@ -271,8 +282,17 @@ function buildForecastUrl(location) {
             "precipitation_probability_max",
             "wind_speed_10m_max"
         ].join(","),
+        hourly: [
+            "temperature_2m",
+            "apparent_temperature",
+            "precipitation_probability",
+            "precipitation",
+            "weather_code",
+            "wind_speed_10m"
+        ].join(","),
         timezone: "auto",
-        forecast_days: "7"
+        forecast_days: "7",
+        forecast_hours: "24"
     });
     return `${WEATHER_API}?${params.toString()}`;
 }
@@ -341,8 +361,206 @@ function renderWeather(location, data, isCached = false) {
     elements.updatedAt.textContent = isCached ? "上次缓存数据" : `${formatTime(current.time)} 更新`;
 
     setCharacter(category, location.name, current.weather_code);
+    renderHourlyForecast(data.hourly, current);
     renderForecast(daily);
     updateForecastSummary(daily);
+}
+
+function getWeatherChangeGroup(code) {
+    const category = getWeatherInfo(code).category;
+    if (["drizzle", "rain", "shower"].includes(category)) return "rain";
+    if (["storm", "hail"].includes(category)) return "storm";
+    if (category === "clear") return "clear";
+    if (category === "cloudy") return "cloudy";
+    return category;
+}
+
+function isPrecipitationGroup(group) {
+    return ["rain", "storm", "snow"].includes(group);
+}
+
+function formatHourlyTime(isoTime, index, firstDate) {
+    if (index === 0) return "现在";
+    const [date, time] = isoTime.split("T");
+    const hour = time.slice(0, 2);
+    if (date !== firstDate && hour === "00") return "明日 00时";
+    return `${hour}时`;
+}
+
+function createTrendPath(points) {
+    if (!points.length) return "";
+    return points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+}
+
+function buildHourlyEntries(hourly) {
+    if (!hourly?.time?.length) return [];
+    return hourly.time.slice(0, 24).map((time, index) => ({
+        time,
+        temperature: Number(hourly.temperature_2m[index]),
+        apparentTemperature: Number(hourly.apparent_temperature[index]),
+        precipitationProbability: Number(hourly.precipitation_probability[index] || 0),
+        precipitation: Number(hourly.precipitation[index] || 0),
+        weatherCode: Number(hourly.weather_code[index]),
+        windSpeed: Number(hourly.wind_speed_10m[index] || 0)
+    }));
+}
+
+function getPrecipitationDuration(entries, startIndex) {
+    let duration = 0;
+    for (let index = startIndex; index < entries.length; index += 1) {
+        if (!isPrecipitationGroup(getWeatherChangeGroup(entries[index].weatherCode))) break;
+        duration += 1;
+    }
+    return duration;
+}
+
+function formatPrecipitationDuration(duration, kind = "降水") {
+    if (duration <= 1) return `${kind}过程可能较短`;
+    if (duration <= 5) return `预计持续约 ${duration} 小时`;
+    return "之后数小时仍可能有降水";
+}
+
+function updateShortTermNotice(entries, current) {
+    elements.changeNotice.hidden = true;
+    if (entries.length < 2) return;
+
+    const currentGroup = getWeatherChangeGroup(current.weather_code);
+    const currentIsWet = isPrecipitationGroup(currentGroup);
+    const lookahead = entries.slice(1, 6);
+    let changeIndex = -1;
+
+    if (currentIsWet) {
+        changeIndex = lookahead.findIndex(entry => !isPrecipitationGroup(getWeatherChangeGroup(entry.weatherCode)));
+    } else {
+        changeIndex = lookahead.findIndex(entry => isPrecipitationGroup(getWeatherChangeGroup(entry.weatherCode)));
+    }
+    if (changeIndex < 0) {
+        changeIndex = lookahead.findIndex(entry => getWeatherChangeGroup(entry.weatherCode) !== currentGroup);
+    }
+    if (changeIndex < 0) return;
+
+    const targetIndex = changeIndex + 1;
+    const target = entries[targetIndex];
+    const targetWeather = getWeatherInfo(target.weatherCode);
+    const targetGroup = getWeatherChangeGroup(target.weatherCode);
+    const leadHours = targetIndex;
+    const leadText = leadHours === 1 ? "约 1 小时内" : `约 ${leadHours} 小时后`;
+    const targetIsWet = isPrecipitationGroup(targetGroup);
+
+    elements.changeNoticeSymbol.textContent = targetWeather.symbol;
+
+    if (!currentIsWet && targetIsWet) {
+        const eventName = targetGroup === "snow" ? "降雪" : targetGroup === "storm" ? "雷雨" : "降雨";
+        const duration = getPrecipitationDuration(entries, targetIndex);
+        elements.changeNoticeTitle.textContent = `${leadText}可能开始${eventName}`;
+        elements.changeNoticeDetail.textContent = `${formatPrecipitationDuration(duration, eventName)}，届时降水概率约 ${formatNumber(target.precipitationProbability, "0")}%`;
+    } else if (currentIsWet && !targetIsWet) {
+        elements.changeNoticeTitle.textContent = `${leadText}降水可能减弱`;
+        elements.changeNoticeDetail.textContent = `预计转为${targetWeather.text}，外出仍建议留意临近天气变化。`;
+    } else if (currentIsWet && targetIsWet) {
+        const duration = getPrecipitationDuration(entries, targetIndex);
+        elements.changeNoticeTitle.textContent = `${leadText}雨雪形态可能变化`;
+        elements.changeNoticeDetail.textContent = `预计转为${targetWeather.text}，${formatPrecipitationDuration(duration)}。`;
+    } else {
+        elements.changeNoticeTitle.textContent = `${leadText}天气可能转为${targetWeather.text}`;
+        elements.changeNoticeDetail.textContent = `预计温度约 ${formatNumber(target.temperature)}°，风速约 ${formatNumber(target.windSpeed)} km/h。`;
+    }
+
+    elements.changeNotice.hidden = false;
+}
+
+function renderHourlyTrend(entries) {
+    const chartWidth = 1920;
+    const chartHeight = 88;
+    const horizontalStep = chartWidth / entries.length;
+    const temperatures = entries.map(entry => entry.temperature);
+    const minimum = Math.min(...temperatures);
+    const maximum = Math.max(...temperatures);
+    const range = Math.max(maximum - minimum, 1);
+    const points = entries.map((entry, index) => ({
+        x: (horizontalStep * index) + (horizontalStep / 2),
+        y: 68 - (((entry.temperature - minimum) / range) * 48)
+    }));
+    const linePath = createTrendPath(points);
+    const areaPath = `${linePath} L ${points.at(-1).x.toFixed(1)} ${chartHeight} L ${points[0].x.toFixed(1)} ${chartHeight} Z`;
+
+    elements.hourlyChartLine.setAttribute("d", linePath);
+    elements.hourlyChartArea.setAttribute("d", areaPath);
+    elements.hourlyChartPoints.replaceChildren();
+
+    const pointsFragment = document.createDocumentFragment();
+    points.forEach((point, index) => {
+        if (index % 3 !== 0 && index !== points.length - 1) return;
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("class", "hourly-chart-point");
+        circle.setAttribute("cx", point.x.toFixed(1));
+        circle.setAttribute("cy", point.y.toFixed(1));
+        circle.setAttribute("r", index === 0 ? "5" : "3.5");
+        pointsFragment.append(circle);
+    });
+    elements.hourlyChartPoints.append(pointsFragment);
+}
+
+function renderHourlyForecast(hourly, current) {
+    const entries = buildHourlyEntries(hourly);
+    if (!entries.length) {
+        elements.hourlySection.hidden = true;
+        return;
+    }
+
+    elements.hourlySection.hidden = false;
+    elements.hourlyTimeRow.replaceChildren();
+    elements.hourlyList.replaceChildren();
+    const firstDate = entries[0].time.split("T")[0];
+    const timeFragment = document.createDocumentFragment();
+    const listFragment = document.createDocumentFragment();
+
+    entries.forEach((entry, index) => {
+        const weather = getWeatherInfo(entry.weatherCode);
+        const time = document.createElement("span");
+        time.textContent = formatHourlyTime(entry.time, index, firstDate);
+        timeFragment.append(time);
+
+        const card = document.createElement("article");
+        card.className = "hourly-item";
+        card.setAttribute(
+            "aria-label",
+            `${formatHourlyTime(entry.time, index, firstDate)}，${weather.text}，${formatNumber(entry.temperature)}度，降水概率${formatNumber(entry.precipitationProbability, "0")}%`
+        );
+
+        const symbol = document.createElement("span");
+        symbol.className = "hourly-symbol";
+        symbol.setAttribute("aria-hidden", "true");
+        symbol.textContent = weather.symbol;
+
+        const temperature = document.createElement("strong");
+        temperature.className = "hourly-temperature";
+        temperature.textContent = `${formatNumber(entry.temperature)}°`;
+
+        const condition = document.createElement("span");
+        condition.className = "hourly-condition";
+        condition.textContent = weather.text;
+
+        const rain = document.createElement("span");
+        rain.className = "hourly-rain";
+        if (entry.precipitationProbability >= 40 || entry.precipitation > 0) rain.classList.add("has-rain");
+        rain.textContent = `☂ ${formatNumber(entry.precipitationProbability, "0")}%`;
+
+        const wind = document.createElement("span");
+        wind.className = "hourly-wind";
+        wind.textContent = `风 ${formatNumber(entry.windSpeed)} km/h`;
+
+        card.append(symbol, temperature, condition, rain, wind);
+        listFragment.append(card);
+    });
+
+    elements.hourlyTimeRow.append(timeFragment);
+    elements.hourlyList.append(listFragment);
+    renderHourlyTrend(entries);
+    updateShortTermNotice(entries, current);
+
+    const temperatures = entries.map(entry => entry.temperature);
+    elements.hourlySummary.textContent = `${formatTime(entries[0].time)} 起 · ${formatNumber(Math.min(...temperatures))}° 至 ${formatNumber(Math.max(...temperatures))}°`;
 }
 
 function renderForecast(daily) {
