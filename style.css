@@ -307,7 +307,7 @@ a {
     position: absolute;
     z-index: 3;
     right: 1%;
-    bottom: 1%;
+    bottom: 18px;
     max-width: 270px;
     padding: 15px 18px;
     border: 1px solid rgba(255, 255, 255, 0.76);
@@ -315,7 +315,7 @@ a {
     background: rgba(255, 255, 255, 0.74);
     box-shadow: 0 18px 46px rgba(51, 58, 78, 0.11);
     backdrop-filter: blur(16px);
-    transform: translate(3%, 38%);
+    transform: translateX(3%);
 }
 
 .character-caption-header {
