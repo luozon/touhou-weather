@@ -219,7 +219,7 @@ a {
     grid-template-rows: minmax(310px, 1fr) auto;
     min-width: 0;
     min-height: 0;
-    gap: 14px;
+    gap: 58px;
 }
 
 .character-stage {
