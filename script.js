@@ -5,6 +5,7 @@ const GEOCODING_API = "https://geocoding-api.open-meteo.com/v1/search";
 const DISTRICT_DATA_URL = "data/districts.json";
 const STORAGE_LOCATION_KEY = "touhou-weather:last-location";
 const STORAGE_CACHE_KEY = "touhou-weather:last-forecast";
+const STORAGE_CHARACTER_KEY = "touhou-weather:last-character";
 
 const DEFAULT_LOCATION = Object.freeze({
     name: "北京",
@@ -58,16 +59,20 @@ const CHARACTERS = Object.freeze({
 });
 
 const CHARACTER_GROUPS = Object.freeze({
-    clear: ["reimu.jpg", "youmu.jpg", "utsuho.jpg", "tenshi.jpg"],
+    clearDay: ["reimu.jpg", "youmu.jpg", "utsuho.jpg", "tenshi.jpg", "mokou.png"],
+    clearNight: ["eirin.png", "keine.png", "ran.png"],
     cloudy: ["sakuya.jpg", "reisen.jpg", "sanae.jpg", "patchouli.jpg"],
-    drizzle: ["marisa.jpg", "suwako.jpg"],
-    rain: ["marisa.jpg", "suwako.jpg"],
-    shower: ["yukari.jpg", "suika.jpg"],
-    storm: ["iku.jpg", "aya.jpg"],
-    snow: ["yuyuko.jpg", "cirno.jpg"],
-    fog: ["remilia.jpg", "komachi.jpg"],
-    hail: ["alice.jpg"],
-    windy: ["meiling.jpg"]
+    overcast: ["satori.png", "kaguya.png", "rumia.png", "patchouli.jpg"],
+    lightRain: ["marisa.jpg", "suwako.jpg", "nitori.png", "kogasa.png"],
+    moderateRain: ["marisa.jpg", "suwako.jpg", "nitori.png", "yukari.jpg", "suika.jpg", "kogasa.png"],
+    heavyRain: ["nitori.png", "yukari.jpg", "suika.jpg", "kogasa.png"],
+    storm: ["iku.jpg", "aya.jpg", "kanako.png"],
+    hail: ["alice.jpg", "flandre.png", "eiki.png"],
+    lightSnow: ["tewi.png", "cirno.jpg", "chen.png"],
+    moderateSnow: ["letty.png", "yuyuko.jpg", "cirno.jpg"],
+    heavySnow: ["letty.png", "yuyuko.jpg"],
+    fog: ["remilia.jpg", "komachi.jpg", "murasa.png", "koishi.png", "daiyousei.png"],
+    windy: ["meiling.jpg", "hina.png", "lilywhite.png", "yuuka.png"]
 });
 
 const WEATHER_CODES = Object.freeze({
@@ -106,6 +111,7 @@ const elements = {
     characterStage: document.querySelector(".character-stage"),
     characterName: document.getElementById("character-name"),
     characterNote: document.getElementById("character-note"),
+    characterNextButton: document.getElementById("character-next-button"),
     localDate: document.getElementById("local-date"),
     locateButton: document.getElementById("locate-button"),
     searchForm: document.getElementById("city-search-form"),
@@ -163,6 +169,7 @@ const areaParentIndex = new Map();
 let administrativeSearchIndex = [];
 let currentSearchResults = [];
 let activeSearchIndex = -1;
+let currentCharacterRotation = null;
 
 function getWeatherInfo(code) {
     return WEATHER_CODES[Number(code)] || { text: "天气状况未知", symbol: "·", category: "cloudy" };
@@ -176,104 +183,65 @@ function getEffectiveCategory(code, windSpeed) {
     return info.category;
 }
 
-function hashText(text) {
-    return Array.from(text).reduce((hash, character) => ((hash * 31) + character.codePointAt(0)) >>> 0, 7);
-}
-
-function getObservationParts(current) {
-    const [datePart = "", timePart = ""] = String(current.time || "").split("T");
-    const [year, month, day] = datePart.split("-").map(Number);
-    const hour = Number(timePart.slice(0, 2));
-    const date = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)
-        ? new Date(year, month - 1, day, 12)
-        : new Date();
-
-    return {
-        date,
-        month: date.getMonth() + 1,
-        hour: Number.isFinite(hour) ? hour : new Date().getHours(),
-        isNight: Number(current.is_day) === 0
-    };
-}
-
-function getMoonIllumination(date) {
-    const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
-    const lunarCycleDays = 29.53058867;
-    const age = (((date.getTime() - knownNewMoon) / 86400000) % lunarCycleDays + lunarCycleDays) % lunarCycleDays;
-    return (1 - Math.cos((age / lunarCycleDays) * Math.PI * 2)) / 2;
-}
-
-function getCharacterCandidates(category, locationName, current) {
+function getCharacterCandidates(category, current) {
     const weatherCode = Number(current.weather_code);
-    const temperature = Number(current.temperature_2m);
-    const humidity = Number(current.relative_humidity_2m);
-    const precipitation = Number(current.precipitation || 0);
-    const cloudCover = Number(current.cloud_cover);
-    const { date, month, hour, isNight } = getObservationParts(current);
-    const isMorning = hour >= 4 && hour <= 8;
-    const isSpring = month >= 3 && month <= 5;
-    const nearFullMoon = getMoonIllumination(date) >= 0.9;
-    const stableKey = `${date.toISOString().slice(0, 10)}:${locationName}:${weatherCode}`;
-    const baseGroup = CHARACTER_GROUPS[category] || CHARACTER_GROUPS.cloudy;
-
-    // 特殊天气按优先级先判定，普通天气则保留原有角色分组轮换。
-    if (weatherCode === 99) return ["flandre.png", "eiki.png"];
-    if (weatherCode === 96) return ["alice.jpg"];
-    if (weatherCode === 95) return ["kanako.png", ...baseGroup];
-
-    if (["clear", "cloudy", "fog"].includes(category) && isMorning && temperature <= 2 && precipitation === 0) {
-        return ["chen.png"];
-    }
-
-    if (category === "snow") {
-        if ([71, 77].includes(weatherCode)) return ["tewi.png", "letty.png", ...baseGroup];
-        return ["letty.png", ...baseGroup];
-    }
-
-    if (category === "fog") {
-        const fogCharacters = ["murasa.png", "koishi.png", ...baseGroup];
-        if (isNight) fogCharacters.unshift("rumia.png");
-        if (isMorning && humidity >= 85) fogCharacters.unshift("daiyousei.png");
-        return fogCharacters;
-    }
-
-    if (category === "shower") return ["kogasa.png", ...baseGroup];
-    if (["drizzle", "rain"].includes(category)) return ["nitori.png", ...baseGroup];
-
-    if (category === "windy") {
-        const windCharacters = ["hina.png", ...baseGroup];
-        if (isSpring) windCharacters.unshift("lilywhite.png", "yuuka.png");
-        return windCharacters;
-    }
-
-    if (category === "clear") {
-        if (temperature >= 32) return ["mokou.png"];
-        if (isMorning && humidity >= 85) return ["daiyousei.png", ...baseGroup];
-        if (isNight && nearFullMoon) return ["keine.png"];
-        if (isNight) return ["eirin.png", ...baseGroup];
-        if (temperature <= 5 && hashText(stableKey) % 5 === 0) return ["ran.png", ...baseGroup];
-    }
-
-    if (category === "cloudy") {
-        if (isNight && nearFullMoon) return ["kaguya.png", ...baseGroup];
-        if (isNight) return ["rumia.png", ...baseGroup];
-        if (cloudCover >= 80) return ["satori.png", ...baseGroup];
-    }
-
-    return baseGroup;
+    if (category === "clear") return Number(current.is_day) === 0 ? CHARACTER_GROUPS.clearNight : CHARACTER_GROUPS.clearDay;
+    if (category === "cloudy") return weatherCode === 3 ? CHARACTER_GROUPS.overcast : CHARACTER_GROUPS.cloudy;
+    if ([51, 53, 56, 61, 80].includes(weatherCode)) return CHARACTER_GROUPS.lightRain;
+    if ([55, 57, 63, 66, 81].includes(weatherCode)) return CHARACTER_GROUPS.moderateRain;
+    if ([65, 67, 82].includes(weatherCode)) return CHARACTER_GROUPS.heavyRain;
+    if ([71, 77, 85].includes(weatherCode)) return CHARACTER_GROUPS.lightSnow;
+    if (weatherCode === 73) return CHARACTER_GROUPS.moderateSnow;
+    if ([75, 86].includes(weatherCode)) return CHARACTER_GROUPS.heavySnow;
+    return CHARACTER_GROUPS[category] || CHARACTER_GROUPS.cloudy;
 }
 
-function setCharacter(category, locationName, current) {
-    const dayKey = String(current.time || new Date().toISOString()).slice(0, 10);
-    const weatherCode = Number(current.weather_code);
-    const group = getCharacterCandidates(category, locationName, current);
-    const imageName = group[hashText(`${dayKey}:${locationName}:${weatherCode}`) % group.length];
+function getPreviousCharacter() {
+    try {
+        return sessionStorage.getItem(STORAGE_CHARACTER_KEY);
+    } catch (error) {
+        return null;
+    }
+}
+
+function savePreviousCharacter(imageName) {
+    try {
+        sessionStorage.setItem(STORAGE_CHARACTER_KEY, imageName);
+    } catch (error) {
+        // 角色轮换在禁用存储的环境中仍可正常使用。
+    }
+}
+
+function pickNextCharacter(group) {
+    if (group.length === 1) return group[0];
+
+    const previous = getPreviousCharacter();
+    const available = group.filter(imageName => imageName !== previous);
+    const choices = available.length ? available : group;
+    return choices[Math.floor(Math.random() * choices.length)];
+}
+
+function applyCharacter(imageName, category) {
     const character = CHARACTERS[imageName];
 
     elements.characterStage.style.setProperty("--character-image", `url("images/${imageName}")`);
     elements.characterName.textContent = character.name;
     elements.characterNote.textContent = character.note;
     elements.body.dataset.weather = category === "windy" ? "cloudy" : category;
+    savePreviousCharacter(imageName);
+}
+
+function setCharacter(category, current) {
+    const group = getCharacterCandidates(category, current);
+    currentCharacterRotation = { category, group };
+    elements.characterNextButton.disabled = group.length < 2;
+    applyCharacter(pickNextCharacter(group), category);
+}
+
+function rotateCharacter() {
+    if (!currentCharacterRotation || currentCharacterRotation.group.length < 2) return;
+    const { category, group } = currentCharacterRotation;
+    applyCharacter(pickNextCharacter(group), category);
 }
 
 function formatLocalDate() {
@@ -465,7 +433,7 @@ function renderWeather(location, data, isCached = false) {
     elements.sunTimes.textContent = `${formatTime(daily.sunrise[0])} / ${formatTime(daily.sunset[0])}`;
     elements.updatedAt.textContent = isCached ? "上次缓存数据" : `${formatTime(current.time)} 更新`;
 
-    setCharacter(category, location.name, current);
+    setCharacter(category, current);
     renderHourlyForecast(data.hourly, current);
     renderForecast(daily);
     updateForecastSummary(daily);
@@ -1354,6 +1322,7 @@ function bindEvents() {
     });
 
     elements.locateButton.addEventListener("click", () => useCurrentPosition());
+    elements.characterNextButton.addEventListener("click", rotateCharacter);
 
     elements.districtToggle.addEventListener("click", () => toggleDistrictPanel());
     elements.districtClose.addEventListener("click", () => toggleDistrictPanel(false));

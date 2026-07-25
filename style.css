@@ -308,6 +308,13 @@ a {
     transform: translate(3%, 38%);
 }
 
+.character-caption-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 .eyebrow {
     display: block;
     margin-bottom: 7px;
@@ -315,6 +322,34 @@ a {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.18em;
+}
+
+.character-next-button {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid rgba(var(--accent-rgb), 0.22);
+    border-radius: 50%;
+    color: var(--accent);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.78);
+    transition: transform 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.character-next-button:hover:not(:disabled) {
+    color: #fff;
+    background: var(--accent);
+    transform: rotate(90deg);
+}
+
+.character-next-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .character-caption strong {
