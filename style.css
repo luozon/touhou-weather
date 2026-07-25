@@ -382,23 +382,24 @@ a {
     padding-top: 2px;
 }
 
-.sidebar-location-row {
+.district-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 10px;
-    padding: 0 3px;
-    color: var(--ink-soft);
-    font-size: 11px;
-    letter-spacing: 0.08em;
+    gap: 8px;
+    margin-top: 8px;
 }
 
-.sidebar-location-row .location-button {
+.district-actions .district-toggle {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: 0;
+}
+
+.district-actions .location-button {
+    flex: 0 0 auto;
     min-height: 38px;
-    padding: 0 13px;
+    padding: 0 12px;
     font-size: 12px;
-    letter-spacing: 0;
 }
 
 .dashboard {
@@ -1567,6 +1568,27 @@ input:focus-visible {
     .location-button span {
         color: var(--ink);
         font-size: 18px;
+    }
+
+    .district-actions {
+        gap: 6px;
+    }
+
+    .district-actions .location-button {
+        min-height: 36px;
+        padding: 0 9px;
+        font-size: 11px;
+    }
+
+    .district-actions .district-toggle {
+        gap: 7px;
+        padding-right: 8px;
+    }
+
+    .district-actions .district-toggle-mark {
+        width: 30px;
+        height: 30px;
+        font-size: 15px;
     }
 
     .character-stage {

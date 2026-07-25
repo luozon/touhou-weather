@@ -48,13 +48,6 @@
             </section>
 
             <section class="side-controls" aria-label="位置与天气查询">
-                <div class="sidebar-location-row">
-                    <span>定位观测点</span>
-                    <button class="location-button" id="locate-button" type="button">
-                        <span aria-hidden="true">⌖</span>
-                        使用当前位置
-                    </button>
-                </div>
                 <div class="search-area">
                     <form class="search-form" id="city-search-form" role="search" autocomplete="off">
                         <label class="sr-only" for="city-search-input">搜索城市或地区</label>
@@ -83,20 +76,26 @@
                         <button type="button" data-adcode="610100" data-name="西安" data-latitude="34.3416" data-longitude="108.9398">西安</button>
                     </div>
 
-                    <button
-                        class="district-toggle"
-                        id="district-toggle"
-                        type="button"
-                        aria-expanded="false"
-                        aria-controls="district-panel"
-                    >
-                        <span class="district-toggle-mark" aria-hidden="true">界</span>
-                        <span class="district-toggle-copy">
-                            <strong>按区县选择</strong>
-                            <small id="district-toggle-context">省份 · 城市 · 区 / 县</small>
-                        </span>
-                        <span class="district-toggle-arrow" aria-hidden="true">⌄</span>
-                    </button>
+                    <div class="district-actions">
+                        <button
+                            class="district-toggle"
+                            id="district-toggle"
+                            type="button"
+                            aria-expanded="false"
+                            aria-controls="district-panel"
+                        >
+                            <span class="district-toggle-mark" aria-hidden="true">界</span>
+                            <span class="district-toggle-copy">
+                                <strong>按区县选择</strong>
+                                <small id="district-toggle-context">省份 · 城市 · 区 / 县</small>
+                            </span>
+                            <span class="district-toggle-arrow" aria-hidden="true">⌄</span>
+                        </button>
+                        <button class="location-button" id="locate-button" type="button">
+                            <span aria-hidden="true">⌖</span>
+                            使用当前位置
+                        </button>
+                    </div>
 
                     <section class="district-panel" id="district-panel" aria-labelledby="district-panel-title" hidden>
                         <div class="district-panel-heading">
