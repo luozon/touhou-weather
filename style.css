@@ -204,25 +204,35 @@ a {
 
 .main-layout {
     display: grid;
-    grid-template-columns: minmax(420px, 0.88fr) minmax(650px, 1.12fr);
+    grid-template-columns: minmax(390px, 0.82fr) minmax(650px, 1.18fr);
     gap: clamp(20px, 3vw, 64px);
     width: min(1720px, calc(100% - 64px));
-    min-height: calc(100vh - 82px);
+    height: calc(100dvh - 82px);
+    min-height: 630px;
     margin: 0 auto;
-    padding-bottom: 34px;
+    padding-bottom: 24px;
+    overflow: hidden;
+}
+
+.sidebar {
+    display: grid;
+    grid-template-rows: minmax(310px, 1fr) auto;
+    min-width: 0;
+    min-height: 0;
+    gap: 14px;
 }
 
 .character-stage {
     position: relative;
-    align-self: stretch;
     min-height: 0;
 }
 
 .character-art {
-    position: sticky;
-    top: 92px;
+    position: relative;
+    top: auto;
     width: 100%;
-    aspect-ratio: 10 / 9;
+    height: 100%;
+    aspect-ratio: auto;
     isolation: isolate;
     background-image: var(--character-image, url("images/patchouli.jpg"));
     background-repeat: no-repeat;
@@ -366,9 +376,51 @@ a {
     line-height: 1.65;
 }
 
+.side-controls {
+    position: relative;
+    z-index: 8;
+    padding-top: 2px;
+}
+
+.sidebar-location-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 10px;
+    padding: 0 3px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+}
+
+.sidebar-location-row .location-button {
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
 .dashboard {
-    align-self: start;
-    padding-top: 12px;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 18px 34px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-rgb), 0.4) transparent;
+}
+
+.dashboard::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dashboard::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(var(--accent-rgb), 0.38);
+    background-clip: padding-box;
 }
 
 .search-area {
@@ -1225,6 +1277,14 @@ input:focus-visible {
 }
 
 @media (max-width: 980px) {
+    body {
+        overflow-y: auto;
+    }
+
+    .app-shell {
+        overflow: visible;
+    }
+
     .topbar,
     .main-layout {
         width: min(760px, calc(100% - 32px));
@@ -1232,11 +1292,19 @@ input:focus-visible {
 
     .main-layout {
         display: block;
+        height: auto;
+        min-height: 0;
+        padding-bottom: 34px;
+        overflow: visible;
+    }
+
+    .sidebar {
+        display: block;
     }
 
     .character-stage {
         min-height: 570px;
-        margin-bottom: -48px;
+        margin-bottom: 14px;
     }
 
     .character-art {
@@ -1259,6 +1327,14 @@ input:focus-visible {
     .dashboard {
         position: relative;
         z-index: 5;
+        height: auto;
+        min-height: 0;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .side-controls {
+        margin-bottom: 18px;
     }
 
     .search-form,
@@ -1292,7 +1368,7 @@ input:focus-visible {
 
     .character-stage {
         min-height: 470px;
-        margin-bottom: -24px;
+        margin-bottom: 14px;
     }
 
     .character-art {

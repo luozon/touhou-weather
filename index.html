@@ -23,14 +23,11 @@
 
             <div class="topbar-actions">
                 <time id="local-date">正在校准历法</time>
-                <button class="location-button" id="locate-button" type="button">
-                    <span aria-hidden="true">⌖</span>
-                    使用当前位置
-                </button>
             </div>
         </header>
 
         <main class="main-layout">
+            <aside class="sidebar" aria-label="天气查询与角色插画">
             <section class="character-stage" aria-label="今日天气对应的东方角色">
                 <div class="character-art">
                     <div class="orbit orbit-one" aria-hidden="true"></div>
@@ -50,7 +47,14 @@
                 </div>
             </section>
 
-            <section class="dashboard" aria-label="天气预报面板">
+            <section class="side-controls" aria-label="位置与天气查询">
+                <div class="sidebar-location-row">
+                    <span>定位观测点</span>
+                    <button class="location-button" id="locate-button" type="button">
+                        <span aria-hidden="true">⌖</span>
+                        使用当前位置
+                    </button>
+                </div>
                 <div class="search-area">
                     <form class="search-form" id="city-search-form" role="search" autocomplete="off">
                         <label class="sr-only" for="city-search-input">搜索城市或地区</label>
@@ -61,7 +65,7 @@
                             type="search"
                             role="combobox"
                             aria-autocomplete="list"
-                            placeholder="搜索省、市、区县，例如：安徽、六安、金安区"
+                            placeholder="搜索省、市、区县"
                             aria-controls="search-results"
                             aria-expanded="false"
                         >
@@ -127,7 +131,10 @@
                         <p class="district-hint" id="district-status">选择后将使用区县中心坐标进行网格天气预测。</p>
                     </section>
                 </div>
+            </section>
+            </aside>
 
+            <section class="dashboard" aria-label="天气预报面板">
                 <article class="current-card">
                     <div class="current-heading">
                         <div>
