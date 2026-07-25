@@ -33,7 +33,28 @@ const CHARACTERS = Object.freeze({
     "remilia.jpg": { name: "蕾米莉亚·斯卡蕾特", note: "薄雾笼罩视线，出行请放慢速度。" },
     "komachi.jpg": { name: "小野塚小町", note: "雾气停留在水面，远处轮廓并不清晰。" },
     "alice.jpg": { name: "爱丽丝·玛格特洛依德", note: "冰雹可能突然落下，请尽快进入室内。" },
-    "meiling.jpg": { name: "红美铃", note: "风势较强，门前的云正在快速移动。" }
+    "meiling.jpg": { name: "红美铃", note: "风势较强，门前的云正在快速移动。" },
+    "rumia.png": { name: "露米娅", note: "夜色与云雾交叠，黑暗正在悄悄靠近。" },
+    "daiyousei.png": { name: "大妖精", note: "清晨的湿润空气里，湖畔凝着一层晨露。" },
+    "letty.png": { name: "蕾蒂·霍瓦特洛克", note: "寒潮带来飞雪，冬日的气息愈发清晰。" },
+    "lilywhite.png": { name: "莉莉霍瓦特", note: "春风吹起，春天到来的消息正在传开。" },
+    "keine.png": { name: "上白泽慧音", note: "接近满月的晴夜，白泽的故事也随月光浮现。" },
+    "kaguya.png": { name: "蓬莱山辉夜", note: "薄云环绕月色，永夜的天象格外朦胧。" },
+    "mokou.png": { name: "藤原妹红", note: "暑热笼罩晴空，不灭的火焰也显得炽烈。" },
+    "yuuka.png": { name: "风见幽香", note: "春风卷过花田，花瓣仿佛随风起舞。" },
+    "nitori.png": { name: "河城荷取", note: "山雨沿着溪谷落下，河童正在留意水位。" },
+    "hina.png": { name: "键山雏", note: "强风卷起旋涡，厄运也随之被带走。" },
+    "kanako.png": { name: "八坂神奈子", note: "雷雨越过山岳，神明正注视着风云变化。" },
+    "kogasa.png": { name: "多多良小伞", note: "骤雨说来就来——这次有被吓到吗？" },
+    "murasa.png": { name: "村纱水蜜", note: "海雾漫上水面，幽灵船的航迹若隐若现。" },
+    "flandre.png": { name: "芙兰朵露·斯卡雷特", note: "强雷暴伴着冰雹，天空正释放惊人的力量。" },
+    "ran.png": { name: "八云蓝", note: "晴朗而寒冷的天空里，仿佛能看见稀有的幻日。" },
+    "chen.png": { name: "橙", note: "清晨的低温凝成初霜，脚步要轻一些。" },
+    "eirin.png": { name: "八意永琳", note: "晴朗夜空洒下月华，药师仍在静静观测。" },
+    "tewi.png": { name: "因幡帝", note: "细雪轻轻落下，也许会带来一点好运。" },
+    "eiki.png": { name: "四季映姬·夜摩仙那度", note: "雷霆划过天际，审判的威严不容忽视。" },
+    "satori.png": { name: "古明地觉", note: "厚重阴云压低天空，连心思也无处藏匿。" },
+    "koishi.png": { name: "古明地恋", note: "轻霭遮住了轮廓，像一段不易察觉的心绪。" }
 });
 
 const CHARACTER_GROUPS = Object.freeze({
@@ -159,9 +180,93 @@ function hashText(text) {
     return Array.from(text).reduce((hash, character) => ((hash * 31) + character.codePointAt(0)) >>> 0, 7);
 }
 
-function setCharacter(category, locationName, weatherCode) {
-    const group = CHARACTER_GROUPS[category] || CHARACTER_GROUPS.cloudy;
-    const dayKey = new Date().toISOString().slice(0, 10);
+function getObservationParts(current) {
+    const [datePart = "", timePart = ""] = String(current.time || "").split("T");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const hour = Number(timePart.slice(0, 2));
+    const date = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)
+        ? new Date(year, month - 1, day, 12)
+        : new Date();
+
+    return {
+        date,
+        month: date.getMonth() + 1,
+        hour: Number.isFinite(hour) ? hour : new Date().getHours(),
+        isNight: Number(current.is_day) === 0
+    };
+}
+
+function getMoonIllumination(date) {
+    const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14);
+    const lunarCycleDays = 29.53058867;
+    const age = (((date.getTime() - knownNewMoon) / 86400000) % lunarCycleDays + lunarCycleDays) % lunarCycleDays;
+    return (1 - Math.cos((age / lunarCycleDays) * Math.PI * 2)) / 2;
+}
+
+function getCharacterCandidates(category, locationName, current) {
+    const weatherCode = Number(current.weather_code);
+    const temperature = Number(current.temperature_2m);
+    const humidity = Number(current.relative_humidity_2m);
+    const precipitation = Number(current.precipitation || 0);
+    const cloudCover = Number(current.cloud_cover);
+    const { date, month, hour, isNight } = getObservationParts(current);
+    const isMorning = hour >= 4 && hour <= 8;
+    const isSpring = month >= 3 && month <= 5;
+    const nearFullMoon = getMoonIllumination(date) >= 0.9;
+    const stableKey = `${date.toISOString().slice(0, 10)}:${locationName}:${weatherCode}`;
+    const baseGroup = CHARACTER_GROUPS[category] || CHARACTER_GROUPS.cloudy;
+
+    // 特殊天气按优先级先判定，普通天气则保留原有角色分组轮换。
+    if (weatherCode === 99) return ["flandre.png", "eiki.png"];
+    if (weatherCode === 96) return ["alice.jpg"];
+    if (weatherCode === 95) return ["kanako.png", ...baseGroup];
+
+    if (["clear", "cloudy", "fog"].includes(category) && isMorning && temperature <= 2 && precipitation === 0) {
+        return ["chen.png"];
+    }
+
+    if (category === "snow") {
+        if ([71, 77].includes(weatherCode)) return ["tewi.png", "letty.png", ...baseGroup];
+        return ["letty.png", ...baseGroup];
+    }
+
+    if (category === "fog") {
+        const fogCharacters = ["murasa.png", "koishi.png", ...baseGroup];
+        if (isNight) fogCharacters.unshift("rumia.png");
+        if (isMorning && humidity >= 85) fogCharacters.unshift("daiyousei.png");
+        return fogCharacters;
+    }
+
+    if (category === "shower") return ["kogasa.png", ...baseGroup];
+    if (["drizzle", "rain"].includes(category)) return ["nitori.png", ...baseGroup];
+
+    if (category === "windy") {
+        const windCharacters = ["hina.png", ...baseGroup];
+        if (isSpring) windCharacters.unshift("lilywhite.png", "yuuka.png");
+        return windCharacters;
+    }
+
+    if (category === "clear") {
+        if (temperature >= 32) return ["mokou.png"];
+        if (isMorning && humidity >= 85) return ["daiyousei.png", ...baseGroup];
+        if (isNight && nearFullMoon) return ["keine.png"];
+        if (isNight) return ["eirin.png", ...baseGroup];
+        if (temperature <= 5 && hashText(stableKey) % 5 === 0) return ["ran.png", ...baseGroup];
+    }
+
+    if (category === "cloudy") {
+        if (isNight && nearFullMoon) return ["kaguya.png", ...baseGroup];
+        if (isNight) return ["rumia.png", ...baseGroup];
+        if (cloudCover >= 80) return ["satori.png", ...baseGroup];
+    }
+
+    return baseGroup;
+}
+
+function setCharacter(category, locationName, current) {
+    const dayKey = String(current.time || new Date().toISOString()).slice(0, 10);
+    const weatherCode = Number(current.weather_code);
+    const group = getCharacterCandidates(category, locationName, current);
     const imageName = group[hashText(`${dayKey}:${locationName}:${weatherCode}`) % group.length];
     const character = CHARACTERS[imageName];
 
@@ -360,7 +465,7 @@ function renderWeather(location, data, isCached = false) {
     elements.sunTimes.textContent = `${formatTime(daily.sunrise[0])} / ${formatTime(daily.sunset[0])}`;
     elements.updatedAt.textContent = isCached ? "上次缓存数据" : `${formatTime(current.time)} 更新`;
 
-    setCharacter(category, location.name, current.weather_code);
+    setCharacter(category, location.name, current);
     renderHourlyForecast(data.hourly, current);
     renderForecast(daily);
     updateForecastSummary(daily);
